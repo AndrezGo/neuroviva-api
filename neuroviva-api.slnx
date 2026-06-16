@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="neuroviva-api/neuroviva-api.csproj" />
+  <Project Path="src/NeuroViva.Domain/NeuroViva.Domain.csproj" />
+  <Project Path="src/NeuroViva.Application/NeuroViva.Application.csproj" />
+  <Project Path="src/NeuroViva.Infrastructure/NeuroViva.Infrastructure.csproj" />
+</Solution>

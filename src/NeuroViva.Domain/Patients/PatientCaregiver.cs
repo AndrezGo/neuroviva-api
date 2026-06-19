@@ -19,4 +19,6 @@ public sealed class PatientCaregiver : Entity<Guid>
         CareRole = careRole,
         StartDate = DateOnly.FromDateTime(DateTime.UtcNow)
     };
+
+    public void UpdateCareRole(string? careRole) => CareRole = careRole;
 }

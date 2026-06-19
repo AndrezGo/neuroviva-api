@@ -1,9 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NeuroViva.Api</RootNamespace>
+    <UserSecretsId>887b8c11-efc2-4cfc-a66d-d350ed4e09f4</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\src\NeuroViva.Application\NeuroViva.Application.csproj" />

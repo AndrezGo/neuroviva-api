@@ -15,7 +15,7 @@ public sealed class PatientDoctorConfiguration : IEntityTypeConfiguration<Patien
         builder.Property(pd => pd.DoctorId).HasColumnName("doctor_id");
         builder.Property(pd => pd.StartDate).HasColumnName("start_date");
         builder.Property(pd => pd.IsActive).HasColumnName("status")
-            .HasConversion(v => v ? "active" : "inactive", v => v == "active");
+            .HasConversion(v => v ? "activo" : "inactivo", v => v == "activo");
         builder.HasIndex(pd => new { pd.PatientId, pd.DoctorId }).IsUnique();
     }
 }

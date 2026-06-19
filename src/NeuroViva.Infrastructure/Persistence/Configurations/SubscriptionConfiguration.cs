@@ -7,6 +7,27 @@ namespace NeuroViva.Infrastructure.Persistence.Configurations;
 
 public sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
+    // suscripcion_estado_check: trial, activa, vencida, cancelada, pausada
+    private static string StatusToDb(SubscriptionStatus v)
+    {
+        if (v == SubscriptionStatus.Trial)     return "trial";
+        if (v == SubscriptionStatus.Active)    return "activa";
+        if (v == SubscriptionStatus.Expired)   return "vencida";
+        if (v == SubscriptionStatus.Cancelled) return "cancelada";
+        if (v == SubscriptionStatus.Paused)    return "pausada";
+        throw new ArgumentOutOfRangeException(nameof(v), v, "Unmapped SubscriptionStatus value.");
+    }
+
+    private static SubscriptionStatus StatusFromDb(string v)
+    {
+        if (v == "trial")     return SubscriptionStatus.Trial;
+        if (v == "activa")    return SubscriptionStatus.Active;
+        if (v == "vencida")   return SubscriptionStatus.Expired;
+        if (v == "cancelada") return SubscriptionStatus.Cancelled;
+        if (v == "pausada")   return SubscriptionStatus.Paused;
+        throw new ArgumentOutOfRangeException(nameof(v), v, "Unknown SubscriptionStatus DB value.");
+    }
+
     public void Configure(EntityTypeBuilder<Subscription> builder)
     {
         builder.ToTable("subscription");
@@ -15,7 +36,7 @@ public sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscri
         builder.Property(s => s.TenantId).HasColumnName("tenant_id");
         builder.Property(s => s.PlanId).HasColumnName("plan_id");
         builder.Property(s => s.Status).HasColumnName("status")
-            .HasConversion(v => v.ToString().ToLowerInvariant(), v => Enum.Parse<SubscriptionStatus>(v, true));
+            .HasConversion(v => StatusToDb(v), v => StatusFromDb(v));
         builder.Property(s => s.TrialStart).HasColumnName("trial_start");
         builder.Property(s => s.TrialEnd).HasColumnName("trial_end");
         builder.Property(s => s.PeriodStart).HasColumnName("period_start");

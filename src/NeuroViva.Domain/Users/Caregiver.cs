@@ -17,4 +17,6 @@ public sealed class Caregiver : Entity<Guid>
         PatientRelationship = relationship,
         CreatedAt = DateTime.UtcNow
     };
+
+    public void SetRelationship(string? relationship) => PatientRelationship = relationship;
 }

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Domain.Abstractions;
 using NeuroViva.Domain.Ai;
@@ -90,6 +91,12 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<StoreTag> StoreTags => Set<StoreTag>();
     public DbSet<StoreReport> StoreReports => Set<StoreReport>();
 
+    public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    {
+        var tx = await Database.BeginTransactionAsync(cancellationToken);
+        return new EfUnitOfWorkTransaction(tx);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -104,5 +111,20 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
             modelBuilder.Entity<Subscription>().HasQueryFilter(e => e.TenantId == tenantId);
             modelBuilder.Entity<PaymentMethod>().HasQueryFilter(e => e.TenantId == tenantId);
         }
+    }
+
+    private sealed class EfUnitOfWorkTransaction : IUnitOfWorkTransaction
+    {
+        private readonly IDbContextTransaction _tx;
+
+        public EfUnitOfWorkTransaction(IDbContextTransaction tx) => _tx = tx;
+
+        public Task CommitAsync(CancellationToken cancellationToken = default)
+            => _tx.CommitAsync(cancellationToken);
+
+        public Task RollbackAsync(CancellationToken cancellationToken = default)
+            => _tx.RollbackAsync(cancellationToken);
+
+        public ValueTask DisposeAsync() => _tx.DisposeAsync();
     }
 }

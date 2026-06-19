@@ -8,5 +8,5 @@ public sealed record SyncUserCommand(
     Guid AuthUserId,
     string Email,
     string? Name,
-    Guid TenantId
+    Guid? TenantId  // optional — auto-creates personal tenant when null
 ) : IRequest<Result<CurrentUserDto>>;

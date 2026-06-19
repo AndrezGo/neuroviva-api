@@ -7,7 +7,7 @@ namespace NeuroViva.Domain.Appointments;
 public sealed class Appointment : AggregateRoot<Guid>
 {
     public Guid PatientId { get; private set; }
-    public Guid DoctorId { get; private set; }
+    public Guid? DoctorId { get; private set; }
     public AppointmentType Type { get; private set; }
     public DateTime ScheduledAt { get; private set; }
     public AppointmentStatus Status { get; private set; }
@@ -17,8 +17,8 @@ public sealed class Appointment : AggregateRoot<Guid>
     private Appointment() { }
 
     public static Appointment Schedule(
-        Guid patientId, Guid doctorId,
-        AppointmentType type, DateTime scheduledAt, string? notes = null) => new()
+        Guid patientId, AppointmentType type, DateTime scheduledAt,
+        string? notes = null, Guid? doctorId = null) => new()
     {
         Id = Guid.NewGuid(),
         PatientId = patientId,

@@ -8,6 +8,6 @@ public sealed class SyncUserCommandValidator : AbstractValidator<SyncUserCommand
     {
         RuleFor(x => x.AuthUserId).NotEmpty();
         RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.TenantId).NotEmpty();
+        // TenantId is optional — auto-creates a personal tenant when null
     }
 }

@@ -14,6 +14,7 @@ public sealed class UserReadRepository : IUserReadRepository
     public async Task<CurrentUserDto?> GetCurrentUserDtoAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await _db.Users
+            .IgnoreQueryFilters()
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
@@ -34,5 +35,23 @@ public sealed class UserReadRepository : IUserReadRepository
             IsActive: user.IsActive,
             Roles: roles,
             CreatedAt: user.CreatedAt);
+    }
+
+    public async Task<UserClaimsData?> GetClaimsByAuthUserIdAsync(Guid authUserId, CancellationToken ct = default)
+    {
+        var user = await _db.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.AuthUserId == authUserId, ct);
+
+        if (user is null) return null;
+
+        var roles = await _db.UserRoles
+            .AsNoTracking()
+            .Where(ur => ur.UserId == user.Id)
+            .Join(_db.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
+            .ToListAsync(ct);
+
+        return new UserClaimsData(user.Id, user.TenantId, roles);
     }
 }

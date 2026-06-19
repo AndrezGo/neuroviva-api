@@ -1,9 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Features.Users.Queries;
 using NeuroViva.Domain.Abstractions;
+using NeuroViva.Domain.Billing.Repositories;
+using NeuroViva.Domain.Catalog.Repositories;
+using NeuroViva.Domain.Appointments.Repositories;
+using NeuroViva.Domain.Medications.Repositories;
+using NeuroViva.Domain.Patients.Repositories;
+using NeuroViva.Domain.Tenancy.Repositories;
 using NeuroViva.Domain.Users.Repositories;
 using NeuroViva.Infrastructure.ExternalServices.Clock;
 using NeuroViva.Infrastructure.Identity;
@@ -44,9 +51,32 @@ public static class DependencyInjection
 
         // Repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<ISubscriptionRepository, SubscriptionRepository>();
+        services.AddScoped<ISubscriptionPlanRepository, SubscriptionPlanRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 
         // Read repositories
         services.AddScoped<IUserReadRepository, UserReadRepository>();
+        services.AddScoped<ICaregiverReadRepository, CaregiverReadRepository>();
+
+        // Caregiver write repositories
+        services.AddScoped<ICaregiverRepository, CaregiverRepository>();
+        services.AddScoped<IPatientCaregiverRepository, PatientCaregiverRepository>();
+
+        // Patient repository
+        services.AddScoped<IPatientRepository, PatientRepository>();
+
+        // Appointment repository
+        services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+
+        // Medication repositories
+        services.AddScoped<IMedicationRepository, MedicationRepository>();
+        services.AddScoped<IMedicationLogRepository, MedicationLogRepository>();
+
+        // Disease repository
+        services.AddScoped<IDiseaseRepository, DiseaseRepository>();
 
         return services;
     }

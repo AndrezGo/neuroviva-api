@@ -15,7 +15,7 @@ public sealed class UserRepository : IUserRepository
         => await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public async Task<User?> GetByAuthUserIdAsync(Guid authUserId, CancellationToken ct = default)
-        => await _db.Users.FirstOrDefaultAsync(u => u.AuthUserId == authUserId, ct);
+        => await _db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.AuthUserId == authUserId, ct);
 
     public async Task<User?> GetByEmailAsync(Guid tenantId, string email, CancellationToken ct = default)
         => await _db.Users.FirstOrDefaultAsync(u => u.TenantId == tenantId && u.Email == email, ct);

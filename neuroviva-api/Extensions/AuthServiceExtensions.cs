@@ -1,6 +1,9 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using NeuroViva.Application.Common.Authorization;
+using NeuroViva.Application.Features.Users.Queries;
 
 namespace NeuroViva.Api.Extensions;
 
@@ -41,6 +44,30 @@ public static class AuthServiceExtensions
                         if (ctx.Exception is SecurityTokenExpiredException)
                             ctx.Response.Headers["Token-Expired"] = "true";
                         return Task.CompletedTask;
+                    },
+
+                    OnTokenValidated = async ctx =>
+                    {
+                        var sub = ctx.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
+                                  ?? ctx.Principal?.FindFirstValue("sub");
+
+                        if (!Guid.TryParse(sub, out var authUserId)) return;
+
+                        var repo = ctx.HttpContext.RequestServices
+                            .GetRequiredService<IUserReadRepository>();
+
+                        var data = await repo.GetClaimsByAuthUserIdAsync(
+                            authUserId, ctx.HttpContext.RequestAborted);
+
+                        if (data is null) return;
+
+                        var identity = ctx.Principal?.Identity as ClaimsIdentity;
+                        if (identity is null) return;
+
+                        identity.AddClaim(new Claim(ClaimNames.InternalUserId, data.InternalUserId.ToString()));
+                        identity.AddClaim(new Claim(ClaimNames.TenantId, data.TenantId.ToString()));
+                        foreach (var role in data.Roles)
+                            identity.AddClaim(new Claim(ClaimTypes.Role, role));
                     }
                 };
             });

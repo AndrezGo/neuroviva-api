@@ -21,8 +21,8 @@ public static class CorsExtensions
                     policy.AllowAnyOrigin();
 
                 policy
-                    .AllowAnyMethod()
-                    .AllowAnyHeader()
+                    .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                    .WithHeaders("Authorization", "Content-Type", "X-Requested-With")
                     .WithExposedHeaders("Token-Expired");
             });
         });

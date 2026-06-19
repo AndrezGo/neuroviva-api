@@ -41,6 +41,14 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
         return patient;
     }
 
+    public void UpdateOnboardingInfo(string name, Guid? diseaseId, DateOnly? dateOfBirth)
+    {
+        Name = name;
+        DiseaseId = diseaseId;
+        DateOfBirth = dateOfBirth;
+        Status = PatientStatus.Active;
+    }
+
     public void Deactivate() => Status = PatientStatus.Inactive;
 
     public void Discharge() => Status = PatientStatus.Discharged;

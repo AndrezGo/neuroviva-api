@@ -11,5 +11,6 @@ public sealed record MedicationListItemDto(
     // ISO 8601 date string (yyyy-MM-dd), or null if no end date
     string? EndDate,
     // ISO 8601 UTC datetime string
-    string CreatedAt
+    string CreatedAt,
+    bool TakenToday
 );

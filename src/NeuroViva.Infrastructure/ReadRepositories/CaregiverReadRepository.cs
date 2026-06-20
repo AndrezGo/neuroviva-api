@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
+using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
@@ -183,6 +184,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
         var patientId = await ResolveActivePatientIdAsync(caregiverUserId, tenantId, ct);
         if (patientId is null) return Array.Empty<MedicationListItemDto>();
 
+        var todayStart = DateTime.UtcNow.Date;
+        var todayEnd = todayStart.AddDays(1);
+
         var rows = await _db.Medications
             .AsNoTracking()
             .Where(m => m.PatientId == patientId.Value)
@@ -197,7 +201,13 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 m.IsActive,
                 m.StartDate,
                 m.EndDate,
-                m.CreatedAt
+                m.CreatedAt,
+                TakenToday = _db.MedicationLogs
+                    .Any(l =>
+                        l.MedicationId == m.Id &&
+                        l.Taken &&
+                        l.LoggedAt >= todayStart &&
+                        l.LoggedAt < todayEnd)
             })
             .ToListAsync(ct);
 
@@ -209,7 +219,8 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             Active: m.IsActive,
             StartDate: m.StartDate.ToString("yyyy-MM-dd"),
             EndDate: m.EndDate?.ToString("yyyy-MM-dd"),
-            CreatedAt: m.CreatedAt.ToString("o"))).ToList();
+            CreatedAt: m.CreatedAt.ToString("o"),
+            TakenToday: m.TakenToday)).ToList();
     }
 
     public async Task<IReadOnlyList<AppointmentListItemDto>> ListAppointmentsAsync(
@@ -258,6 +269,36 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 ScheduledAt: a.ScheduledAt.ToString("o"),
                 Status: a.Status.ToString().ToLowerInvariant());
         }).ToList();
+    }
+
+    public async Task<IReadOnlyList<MedicationLogItemDto>> ListMedicationLogsAsync(
+        Guid caregiverUserId,
+        Guid tenantId,
+        Guid medicationId,
+        CancellationToken ct = default,
+        int take = 200)
+    {
+        var rows = await _db.MedicationLogs
+            .AsNoTracking()
+            .Where(l => l.MedicationId == medicationId)
+            .OrderByDescending(l => l.LoggedAt)
+            .Take(take)
+            .Select(l => new
+            {
+                l.Id,
+                l.Taken,
+                l.LoggedAt,
+                l.Notes,
+                l.LoggedBy
+            })
+            .ToListAsync(ct);
+
+        return rows.Select(l => new MedicationLogItemDto(
+            Id: l.Id,
+            Taken: l.Taken,
+            LoggedAt: l.LoggedAt.ToString("o"),
+            Notes: l.Notes,
+            LoggedBy: l.LoggedBy)).ToList();
     }
 
     /// <summary>

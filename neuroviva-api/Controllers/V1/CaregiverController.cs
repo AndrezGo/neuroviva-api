@@ -7,6 +7,7 @@ using NeuroViva.Application.Caregivers.Commands.CreateMedication;
 using NeuroViva.Application.Caregivers.Commands.LogMedicationDose;
 using NeuroViva.Application.Caregivers.Commands.SaveOnboarding;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
+using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
@@ -131,6 +132,33 @@ public sealed class CaregiverController : ControllerBase
             };
 
         return Ok(new { logId = result.Value.LogId });
+    }
+
+    /// <summary>
+    /// Returns the dose log history for the specified medication.
+    /// The medication must belong to the authenticated caregiver's linked patient.
+    /// </summary>
+    [HttpGet("medications/{medicationId:guid}/logs")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMedicationLogs(
+        Guid medicationId,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetMedicationLogsQuery(medicationId), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
     }
 
     /// <summary>

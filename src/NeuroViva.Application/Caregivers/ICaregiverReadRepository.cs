@@ -1,4 +1,5 @@
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
+using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
@@ -45,4 +46,11 @@ public interface ICaregiverReadRepository
         Guid tenantId,
         CancellationToken ct = default,
         int take = 50);
+
+    Task<IReadOnlyList<MedicationLogItemDto>> ListMedicationLogsAsync(
+        Guid caregiverUserId,
+        Guid tenantId,
+        Guid medicationId,
+        CancellationToken ct = default,
+        int take = 200);
 }

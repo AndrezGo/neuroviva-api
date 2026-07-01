@@ -21,4 +21,10 @@ public sealed class PatientDoctor : Entity<Guid>
     };
 
     public void Deactivate() => IsActive = false;
+
+    public void Reactivate()
+    {
+        IsActive = true;
+        StartDate = DateOnly.FromDateTime(DateTime.UtcNow);
+    }
 }

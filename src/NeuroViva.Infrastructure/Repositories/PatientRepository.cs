@@ -35,6 +35,27 @@ public sealed class PatientRepository : IPatientRepository
                 (p, pc) => p)
             .ToListAsync(ct);
 
+    public async Task<Patient?> GetByDocumentNumberAsync(
+        Guid tenantId,
+        string documentNumber,
+        CancellationToken ct = default)
+    {
+        var normalized = documentNumber.Trim().ToUpperInvariant();
+        // IgnoreQueryFilters because the global filter requires _tenantContext to be set,
+        // which is always true here, but we filter explicitly by tenantId for clarity and safety.
+        return await _db.Patients
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.TenantId == tenantId && p.DocumentNumber == normalized, ct);
+    }
+
+    public async Task<Patient?> GetByUserIdAsync(Guid userId, CancellationToken ct = default)
+    {
+        // UserId is globally unique — crosses tenants, so we ignore the global tenant filter.
+        return await _db.Patients
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(p => p.UserId == userId, ct);
+    }
+
     public async Task AddAsync(Patient patient, CancellationToken ct = default)
         => await _db.Patients.AddAsync(patient, ct);
 

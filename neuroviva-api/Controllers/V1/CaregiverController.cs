@@ -1,16 +1,27 @@
+using System.Globalization;
 using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using NeuroViva.Application.Caregivers.Commands.AddClinicalNote;
+using NeuroViva.Application.Caregivers.Commands.CancelAppointment;
 using NeuroViva.Application.Caregivers.Commands.CreateAppointment;
 using NeuroViva.Application.Caregivers.Commands.CreateMedication;
 using NeuroViva.Application.Caregivers.Commands.LogMedicationDose;
+using NeuroViva.Application.Caregivers.Commands.AssignDoctorToPatient;
+using NeuroViva.Application.Caregivers.Commands.MarkNotificationRead;
+using NeuroViva.Application.Caregivers.Commands.RegisterSymptom;
 using NeuroViva.Application.Caregivers.Commands.SaveOnboarding;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
+using NeuroViva.Application.Caregivers.Queries.GetPatientDoctor;
+using NeuroViva.Application.Caregivers.Queries.GetClinicalHistory;
 using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
+using NeuroViva.Application.Caregivers.Queries.GetNotifications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
+using NeuroViva.Application.Caregivers.Queries.GetSymptoms;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
+using NeuroViva.Application.Caregivers.Queries.LookupPatient;
 using NeuroViva.Application.Common.Authorization;
 using NeuroViva.Application.Common.Models;
 
@@ -39,11 +50,28 @@ public sealed class CaregiverController : ControllerBase
         [FromBody] SaveOnboardingRequest request,
         CancellationToken ct)
     {
+        DateOnly? patientDob = null;
+        if (!string.IsNullOrWhiteSpace(request.PatientDateOfBirth))
+        {
+            if (!DateOnly.TryParseExact(
+                    request.PatientDateOfBirth,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+            {
+                return BadRequest("Invalid PatientDateOfBirth format. Expected YYYY-MM-DD.");
+            }
+            patientDob = parsed;
+        }
+
         var command = new SaveCaregiverOnboardingCommand(
             PatientName: request.PatientName,
             PatientAge: request.PatientAge,
+            PatientDateOfBirth: patientDob,
             Relation: request.Relation,
-            Condition: request.Condition);
+            Condition: request.Condition,
+            DocumentNumber: request.DocumentNumber);
 
         var result = await _mediator.Send(command, ct);
 
@@ -56,6 +84,32 @@ public sealed class CaregiverController : ControllerBase
             };
 
         return Ok(new { patientId = result.Value.PatientId });
+    }
+
+    /// <summary>
+    /// Looks up a patient by document number within the caregiver's tenant.
+    /// Returns basic info and whether the patient has already claimed their account.
+    /// </summary>
+    [HttpGet("patient/lookup")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> LookupPatient(
+        [FromQuery] string documentNumber,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(new LookupPatientQuery(documentNumber), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
     }
 
     /// <summary>
@@ -265,13 +319,232 @@ public sealed class CaregiverController : ControllerBase
 
         return Ok(new { appointmentId = result.Value.AppointmentId });
     }
+
+    /// <summary>
+    /// Cancels a scheduled or confirmed appointment for the caregiver's linked patient.
+    /// </summary>
+    [HttpPatch("appointments/{id:guid}/cancel")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CancelAppointment(Guid id, CancellationToken ct)
+    {
+        var result = await _mediator.Send(new CancelAppointmentCommand(id), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                ErrorType.Conflict => Conflict(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Lists the most recent symptoms (top 50) for the caregiver's linked patient.
+    /// Returns an empty array when no patient is linked.
+    /// </summary>
+    [HttpGet("symptoms")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetSymptoms(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetSymptomsQuery(), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Registers a symptom for the caregiver's linked patient.
+    /// </summary>
+    [HttpPost("symptoms")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RegisterSymptom(
+        [FromBody] RegisterSymptomRequest request,
+        CancellationToken ct)
+    {
+        var command = new RegisterSymptomCommand(
+            Type: request.Type,
+            Intensity: request.Intensity,
+            Description: request.Description,
+            LoggedAt: request.LoggedAt);
+
+        var result = await _mediator.Send(command, ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(new { symptomId = result.Value.SymptomId });
+    }
+
+    /// <summary>
+    /// Returns the unified clinical history timeline for the caregiver's linked patient.
+    /// Combines symptoms, appointments, medication logs and manual clinical records.
+    /// Returns an empty array when no patient is linked.
+    /// </summary>
+    [HttpGet("history")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetHistory(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetClinicalHistoryQuery(), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Adds a manual clinical note (consultation, exam, note or other) to the patient's history.
+    /// </summary>
+    [HttpPost("history")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AddClinicalNote(
+        [FromBody] AddClinicalNoteRequest request,
+        CancellationToken ct)
+    {
+        var command = new AddClinicalNoteCommand(
+            EventType: request.EventType,
+            Description: request.Description,
+            EventDate: request.EventDate);
+
+        var result = await _mediator.Send(command, ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(new { recordId = result.Value.RecordId });
+    }
+
+    /// <summary>
+    /// Returns the most recent 30 InApp notifications for the authenticated caregiver.
+    /// </summary>
+    [HttpGet("notifications")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetNotifications(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetNotificationsQuery(), ct);
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message),
+            };
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Marks an InApp notification as read for the authenticated caregiver.
+    /// </summary>
+    [HttpPatch("notifications/{id:guid}/read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkNotificationRead(Guid id, CancellationToken ct)
+    {
+        var result = await _mediator.Send(new MarkNotificationReadCommand(id), ct);
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound     => NotFound(result.Error.Message),
+                ErrorType.Forbidden    => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message),
+            };
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Returns the doctor currently assigned to the caregiver's linked patient, or null if none.
+    /// </summary>
+    [HttpGet("patient/doctor")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetPatientDoctor(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetPatientDoctorQuery(), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Assigns (or replaces) the active doctor for the caregiver's linked patient.
+    /// Idempotent: if the same doctor is already active, succeeds without changes.
+    /// </summary>
+    [HttpPost("patient/doctor")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AssignDoctorToPatient(
+        [FromBody] AssignDoctorToPatientRequest request,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(new AssignDoctorToPatientCommand(request.DoctorId), ct);
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+        return NoContent();
+    }
 }
 
 public sealed record SaveOnboardingRequest(
     string PatientName,
     int? PatientAge,
+    string? PatientDateOfBirth,
     string? Relation,
-    string Condition);
+    string Condition,
+    string DocumentNumber);
 
 public sealed record LogMedicationDoseRequest(string? Notes);
 
@@ -287,3 +560,16 @@ public sealed record CreateAppointmentRequest(
     string Type,
     string ScheduledAt,
     string? Notes);
+
+public sealed record RegisterSymptomRequest(
+    string Type,
+    int Intensity,
+    string? Description,
+    DateTime? LoggedAt);
+
+public sealed record AddClinicalNoteRequest(
+    string EventType,
+    string Description,
+    DateTime? EventDate);
+
+public sealed record AssignDoctorToPatientRequest(Guid DoctorId);

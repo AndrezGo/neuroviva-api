@@ -1,4 +1,5 @@
 using NeuroViva.Domain.Common;
+using NeuroViva.Domain.Exceptions;
 using NeuroViva.Domain.Patients.Enums;
 using NeuroViva.Domain.Patients.Events;
 
@@ -9,6 +10,8 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
     public Guid TenantId { get; private set; }
     public Guid? DiseaseId { get; private set; }
     public string Name { get; private set; } = default!;
+    public string DocumentNumber { get; private set; } = default!;
+    public Guid? UserId { get; private set; }
     public DateOnly? DateOfBirth { get; private set; }
     public PatientStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
@@ -24,16 +27,30 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
 
     private Patient() { }
 
-    public static Patient Create(Guid tenantId, string name, Guid? diseaseId = null, DateOnly? dateOfBirth = null)
+    public static Patient Create(
+        Guid tenantId,
+        string name,
+        string documentNumber,
+        Guid? diseaseId = null,
+        DateOnly? dateOfBirth = null,
+        Guid? userId = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new BusinessRuleViolationException("patient.name_required", "Patient name cannot be empty.");
+
+        if (string.IsNullOrWhiteSpace(documentNumber))
+            throw new BusinessRuleViolationException("patient.document_number_required", "Patient document number cannot be empty.");
+
         var patient = new Patient
         {
             Id = Guid.NewGuid(),
             TenantId = tenantId,
-            Name = name,
+            Name = name.Trim(),
+            DocumentNumber = documentNumber.Trim().ToUpperInvariant(),
             DiseaseId = diseaseId,
             DateOfBirth = dateOfBirth,
             Status = PatientStatus.Active,
+            UserId = userId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -41,6 +58,37 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
         return patient;
     }
 
+    /// <summary>
+    /// Links this patient to the specified user account.
+    /// Idempotent if the patient is already linked to the same user.
+    /// Throws <see cref="BusinessRuleViolationException"/> if already linked to a different user.
+    /// </summary>
+    public void LinkToUser(Guid userId)
+    {
+        if (UserId.HasValue && UserId.Value != userId)
+            throw new BusinessRuleViolationException(
+                "patient.already_claimed",
+                "Patient already linked to another user");
+
+        UserId = userId;
+    }
+
+    /// <summary>
+    /// Updates name, disease and date of birth only when the patient has not yet claimed
+    /// their own account (UserId is null). Returns true if the update was applied.
+    /// </summary>
+    public bool UpdateProfileIfUnclaimed(string name, Guid? diseaseId, DateOnly? dateOfBirth)
+    {
+        if (UserId is not null)
+            return false;
+
+        Name = name;
+        DiseaseId = diseaseId;
+        DateOfBirth = dateOfBirth;
+        return true;
+    }
+
+    [Obsolete("Use UpdateProfileIfUnclaimed for caregiver-driven onboarding updates.")]
     public void UpdateOnboardingInfo(string name, Guid? diseaseId, DateOnly? dateOfBirth)
     {
         Name = name;

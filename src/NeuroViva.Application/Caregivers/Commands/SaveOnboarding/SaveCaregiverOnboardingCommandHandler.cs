@@ -64,65 +64,71 @@ public sealed class SaveCaregiverOnboardingCommandHandler
             _caregiverRepo.Update(caregiver);
         }
 
-        // 3. Resolve Disease (slug lookup → name fallback → NotFound)
+        // 3. Resolve Disease (slug lookup → name fallback → null if catalog not seeded yet)
         var slug = request.Condition.Trim().ToLowerInvariant();
         var disease = await _diseaseRepo.GetBySlugAsync(slug, cancellationToken)
                       ?? await _diseaseRepo.GetByNameAsync(request.Condition.Trim(), cancellationToken);
+        // disease may be null when the catalog table is not yet seeded;
+        // the patient is still created — diseaseId gets populated later.
 
-        if (disease is null)
-            return Error.NotFound("disease.not_found", $"Disease '{request.Condition}' not found");
+        // 4. Resolve date_of_birth — prefer explicit DOB; fall back to age-derived for retro-compat; null otherwise
+        DateOnly? dateOfBirth = request.PatientDateOfBirth
+            ?? (request.PatientAge.HasValue
+                ? DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-request.PatientAge.Value)
+                : null);
 
-        // 4. Compute date_of_birth from age if provided
-        DateOnly? dateOfBirth = request.PatientAge.HasValue
-            ? DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-request.PatientAge.Value)
-            : null;
-
-        // 5. Look up existing active patient_caregiver rows for this caregiver
-        // We must save the caregiver row before querying by its id, in case it was just created.
+        // 5. Persist the caregiver before the patient lookup so its Id is stable.
         await _uow.SaveChangesAsync(cancellationToken);
 
-        var existingLinks = await _patientCaregiverRepo.GetActiveByCaregiverAsync(
-            caregiver.Id, cancellationToken);
+        // 6. Find-or-create patient by document number within this tenant.
+        var patient = await _patientRepo.GetByDocumentNumberAsync(
+            tenantId, request.DocumentNumber, cancellationToken);
 
-        Guid patientId;
-
-        if (existingLinks.Count > 0)
+        if (patient is null)
         {
-            // Update the most-recent active patient
-            var link = existingLinks[0];
-            var patient = link.Patient;
-
-            patient.UpdateOnboardingInfo(request.PatientName, disease.Id, dateOfBirth);
-            _patientRepo.Update(patient);
-
-            link.Link.UpdateCareRole(request.Relation);
-            _patientCaregiverRepo.Update(link.Link);
-
-            patientId = patient.Id;
-        }
-        else
-        {
-            // Create a new patient and link
-            var patient = Patient.Create(
+            patient = Patient.Create(
                 tenantId: tenantId,
                 name: request.PatientName,
-                diseaseId: disease.Id,
+                documentNumber: request.DocumentNumber,
+                diseaseId: disease?.Id,
                 dateOfBirth: dateOfBirth);
 
             await _patientRepo.AddAsync(patient, cancellationToken);
+        }
+        else
+        {
+            // Only update profile data if the patient has not yet claimed their account.
+            var updated = patient.UpdateProfileIfUnclaimed(request.PatientName, disease?.Id, dateOfBirth);
+            if (updated)
+                _patientRepo.Update(patient);
+        }
 
+        // 7. Find or create the patient-caregiver link to avoid duplicates.
+        // The caregiver was persisted above, so caregiver.Id is guaranteed to be in the DB.
+        // Patient may be new (not yet persisted), but we use a second SaveChanges below.
+        // We must persist the patient first so the FK is resolvable for the link check.
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var existingLink = await _patientCaregiverRepo.GetByPatientAndCaregiverAsync(
+            patient.Id, caregiver.Id, cancellationToken);
+
+        if (existingLink is null)
+        {
             var link = PatientCaregiver.Assign(
                 patientId: patient.Id,
                 caregiverId: caregiver.Id,
                 careRole: request.Relation);
 
             await _patientCaregiverRepo.AddAsync(link, cancellationToken);
-
-            patientId = patient.Id;
+        }
+        else
+        {
+            existingLink.UpdateCareRole(request.Relation);
+            _patientCaregiverRepo.Update(existingLink);
         }
 
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return new SaveCaregiverOnboardingResult(patientId);
+        return new SaveCaregiverOnboardingResult(patient.Id);
     }
 }

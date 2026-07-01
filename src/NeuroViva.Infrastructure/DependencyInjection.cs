@@ -3,11 +3,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Common.Abstractions;
+using NeuroViva.Application.Doctors;
 using NeuroViva.Application.Features.Users.Queries;
 using NeuroViva.Domain.Abstractions;
+using NeuroViva.Domain.Ai.Repositories;
 using NeuroViva.Domain.Billing.Repositories;
 using NeuroViva.Domain.Catalog.Repositories;
 using NeuroViva.Domain.Appointments.Repositories;
+using NeuroViva.Domain.HealthMonitoring.Repositories;
 using NeuroViva.Domain.Medications.Repositories;
 using NeuroViva.Domain.Patients.Repositories;
 using NeuroViva.Domain.Tenancy.Repositories;
@@ -67,6 +70,7 @@ public static class DependencyInjection
 
         // Patient repository
         services.AddScoped<IPatientRepository, PatientRepository>();
+        services.AddScoped<IClinicalRecordRepository, ClinicalRecordRepository>();
 
         // Appointment repository
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();
@@ -77,6 +81,18 @@ public static class DependencyInjection
 
         // Disease repository
         services.AddScoped<IDiseaseRepository, DiseaseRepository>();
+
+        // Health Monitoring repositories
+        services.AddScoped<ISymptomRepository, SymptomRepository>();
+
+        // Notification repository
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+
+        // Doctor repositories
+        services.AddScoped<IDoctorRepository, DoctorRepository>();
+        services.AddScoped<IPatientDoctorRepository, PatientDoctorRepository>();
+        services.AddScoped<IAlertRepository, AlertRepository>();
+        services.AddScoped<IDoctorReadRepository, DoctorReadRepository>();
 
         return services;
     }

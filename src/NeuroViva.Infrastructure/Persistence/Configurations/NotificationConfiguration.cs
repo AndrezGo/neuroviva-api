@@ -14,8 +14,11 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
         builder.Property(n => n.UserId).HasColumnName("user_id");
         builder.Property(n => n.AlertId).HasColumnName("alert_id");
         builder.Property(n => n.Channel).HasColumnName("channel");
+        builder.Property(n => n.Title).HasColumnName("title");
+        builder.Property(n => n.Body).HasColumnName("body");
         builder.Property(n => n.Status).HasColumnName("status");
         builder.Property(n => n.SentAt).HasColumnName("sent_at");
+        builder.Property(n => n.ReadAt).HasColumnName("read_at");
         builder.Property(n => n.CreatedAt).HasColumnName("created_at");
     }
 }

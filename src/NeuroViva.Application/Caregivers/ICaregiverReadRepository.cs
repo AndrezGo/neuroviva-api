@@ -1,7 +1,9 @@
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
+using NeuroViva.Application.Caregivers.Queries.GetClinicalHistory;
 using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
+using NeuroViva.Application.Caregivers.Queries.GetSymptoms;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
 
 namespace NeuroViva.Application.Caregivers;
@@ -53,4 +55,23 @@ public interface ICaregiverReadRepository
         Guid medicationId,
         CancellationToken ct = default,
         int take = 200);
+
+    /// <summary>
+    /// Returns the most recent symptoms (top 50) for the caregiver's linked active patient,
+    /// ordered by logged_at descending. Returns an empty list when no patient is linked.
+    /// </summary>
+    Task<IReadOnlyList<SymptomListItemDto>> ListSymptomsAsync(
+        Guid caregiverUserId,
+        Guid tenantId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the unified clinical history timeline (symptoms + appointments + medication logs + clinical records)
+    /// for the caregiver's linked active patient. Ordered by event date descending, capped at 100 records.
+    /// Returns an empty list when no patient is linked.
+    /// </summary>
+    Task<IReadOnlyList<HistoryEventDto>> ListClinicalHistoryAsync(
+        Guid caregiverUserId,
+        Guid tenantId,
+        CancellationToken ct = default);
 }

@@ -34,6 +34,13 @@ public sealed class PatientCaregiverRepository : IPatientCaregiverRepository
             .ToList();
     }
 
+    public async Task<PatientCaregiver?> GetByPatientAndCaregiverAsync(
+        Guid patientId,
+        Guid caregiverId,
+        CancellationToken ct = default)
+        => await _db.PatientCaregivers
+            .FirstOrDefaultAsync(pc => pc.PatientId == patientId && pc.CaregiverId == caregiverId, ct);
+
     public async Task AddAsync(PatientCaregiver patientCaregiver, CancellationToken ct = default)
         => await _db.PatientCaregivers.AddAsync(patientCaregiver, ct);
 

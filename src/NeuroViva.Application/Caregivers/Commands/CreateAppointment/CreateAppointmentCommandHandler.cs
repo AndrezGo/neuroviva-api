@@ -1,6 +1,7 @@
 using System.Globalization;
 using MediatR;
 using NeuroViva.Application.Common.Abstractions;
+using NeuroViva.Application.Common.Commands.CreateInAppNotification;
 using NeuroViva.Application.Common.Models;
 using NeuroViva.Domain.Abstractions;
 using NeuroViva.Domain.Appointments;
@@ -19,19 +20,22 @@ public sealed class CreateAppointmentCommandHandler
     private readonly IPatientCaregiverRepository _patientCaregiverRepo;
     private readonly IAppointmentRepository _appointmentRepo;
     private readonly IUnitOfWork _uow;
+    private readonly IMediator _mediator;
 
     public CreateAppointmentCommandHandler(
         ICurrentUserService currentUser,
         ICaregiverRepository caregiverRepo,
         IPatientCaregiverRepository patientCaregiverRepo,
         IAppointmentRepository appointmentRepo,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        IMediator mediator)
     {
         _currentUser = currentUser;
         _caregiverRepo = caregiverRepo;
         _patientCaregiverRepo = patientCaregiverRepo;
         _appointmentRepo = appointmentRepo;
         _uow = uow;
+        _mediator = mediator;
     }
 
     public async Task<Result<CreateAppointmentResult>> Handle(
@@ -74,6 +78,15 @@ public sealed class CreateAppointmentCommandHandler
 
         await _appointmentRepo.AddAsync(appointment, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _mediator.Send(new CreateInAppNotificationCommand(
+                _currentUser.UserId.Value,
+                "Cita programada",
+                $"Se programó '{request.Title}' para el {scheduledAt:dd/MM/yyyy HH:mm}"), cancellationToken);
+        }
+        catch { /* swallow: notificación no debe romper el flujo principal */ }
 
         return new CreateAppointmentResult(appointment.Id);
     }

@@ -10,6 +10,14 @@ public interface IPatientCaregiverRepository
         Guid caregiverId,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns the PatientCaregiver link for the specified patient/caregiver pair, or null if not found.
+    /// </summary>
+    Task<PatientCaregiver?> GetByPatientAndCaregiverAsync(
+        Guid patientId,
+        Guid caregiverId,
+        CancellationToken ct = default);
+
     Task AddAsync(PatientCaregiver patientCaregiver, CancellationToken ct = default);
     void Update(PatientCaregiver patientCaregiver);
 }

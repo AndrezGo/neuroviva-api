@@ -1,10 +1,12 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NeuroViva.Api.Extensions;
 using NeuroViva.Api.Middleware;
 using NeuroViva.Application;
 using NeuroViva.Infrastructure;
+using NeuroViva.Infrastructure.Persistence;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,6 +57,28 @@ builder.Services
 
 // ── Build ────────────────────────────────────────────────────
 var app = builder.Build();
+
+// ── Disease catalog seed ──────────────────────────────────────
+// Inserts the six conditions the onboarding wizard exposes.
+// ON CONFLICT DO NOTHING makes this idempotent on every restart.
+await using (var seedScope = app.Services.CreateAsyncScope())
+{
+    var db = seedScope.ServiceProvider.GetRequiredService<NeuroVivaDbContext>();
+    if (!await db.Diseases.AnyAsync())
+    {
+        await db.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO disease (id, name, slug, description, category, active) VALUES
+            ('d0000000-0000-0000-0000-000000000001', 'Alzheimer', 'alzheimer', NULL, 'neurodegenerative', true),
+            ('d0000000-0000-0000-0000-000000000002', 'Parkinson', 'parkinson', NULL, 'neurodegenerative', true),
+            ('d0000000-0000-0000-0000-000000000003', 'Demencia / DCL', 'dementia_mci', NULL, 'neurodegenerative', true),
+            ('d0000000-0000-0000-0000-000000000004', 'ELA', 'als', NULL, 'neurodegenerative', true),
+            ('d0000000-0000-0000-0000-000000000005', 'Huntington', 'huntington', NULL, 'neurodegenerative', true),
+            ('d0000000-0000-0000-0000-000000000006', 'Otra', 'other', NULL, 'other', true)
+            ON CONFLICT (slug) DO NOTHING;
+            """);
+    }
+}
 
 app.UseSerilogRequestLogging(opts =>
     opts.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000}ms");

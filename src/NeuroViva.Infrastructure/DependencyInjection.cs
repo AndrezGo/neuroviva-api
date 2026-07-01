@@ -15,6 +15,7 @@ using NeuroViva.Domain.Medications.Repositories;
 using NeuroViva.Domain.Patients.Repositories;
 using NeuroViva.Domain.Tenancy.Repositories;
 using NeuroViva.Domain.Users.Repositories;
+using NeuroViva.Infrastructure.DomainEvents;
 using NeuroViva.Infrastructure.ExternalServices.Clock;
 using NeuroViva.Infrastructure.Identity;
 using NeuroViva.Infrastructure.Persistence;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
 
         var connectionString = configuration["Database:ConnectionString"]
             ?? throw new InvalidOperationException("Database:ConnectionString is not configured.");
@@ -71,6 +73,7 @@ public static class DependencyInjection
         // Patient repository
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IClinicalRecordRepository, ClinicalRecordRepository>();
+        services.AddScoped<IPatientDiseaseRepository, PatientDiseaseRepository>();
 
         // Appointment repository
         services.AddScoped<IAppointmentRepository, AppointmentRepository>();

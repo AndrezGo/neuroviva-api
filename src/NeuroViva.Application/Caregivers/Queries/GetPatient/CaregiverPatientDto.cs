@@ -5,6 +5,6 @@ public sealed record CaregiverPatientDto(
     string Name,
     int Age,
     string? DateOfBirth,
-    string Condition,
+    IReadOnlyList<string> Conditions,
     string? ConditionStage
 );

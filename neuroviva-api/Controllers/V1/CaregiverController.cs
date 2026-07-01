@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NeuroViva.Application.Caregivers.Commands.AddClinicalNote;
 using NeuroViva.Application.Caregivers.Commands.CancelAppointment;
+using NeuroViva.Application.Caregivers.Commands.SubmitAppointmentOutcome;
 using NeuroViva.Application.Caregivers.Commands.CreateAppointment;
 using NeuroViva.Application.Caregivers.Commands.CreateMedication;
 using NeuroViva.Application.Caregivers.Commands.LogMedicationDose;
@@ -70,7 +71,7 @@ public sealed class CaregiverController : ControllerBase
             PatientAge: request.PatientAge,
             PatientDateOfBirth: patientDob,
             Relation: request.Relation,
-            Condition: request.Condition,
+            Conditions: request.Conditions,
             DocumentNumber: request.DocumentNumber);
 
         var result = await _mediator.Send(command, ct);
@@ -348,6 +349,37 @@ public sealed class CaregiverController : ControllerBase
     }
 
     /// <summary>
+    /// Records the outcome of a past appointment: attended, missed, or cancelled.
+    /// </summary>
+    [HttpPatch("appointments/{id:guid}/outcome")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> SubmitAppointmentOutcome(
+        Guid id,
+        [FromBody] SubmitAppointmentOutcomeRequest request,
+        CancellationToken ct)
+    {
+        var command = new SubmitAppointmentOutcomeCommand(id, request.Outcome);
+        var result = await _mediator.Send(command, ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                ErrorType.Conflict => Conflict(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Lists the most recent symptoms (top 50) for the caregiver's linked patient.
     /// Returns an empty array when no patient is linked.
     /// </summary>
@@ -543,7 +575,7 @@ public sealed record SaveOnboardingRequest(
     int? PatientAge,
     string? PatientDateOfBirth,
     string? Relation,
-    string Condition,
+    IReadOnlyList<string> Conditions,
     string DocumentNumber);
 
 public sealed record LogMedicationDoseRequest(string? Notes);
@@ -573,3 +605,5 @@ public sealed record AddClinicalNoteRequest(
     DateTime? EventDate);
 
 public sealed record AssignDoctorToPatientRequest(Guid DoctorId);
+
+public sealed record SubmitAppointmentOutcomeRequest(string Outcome);

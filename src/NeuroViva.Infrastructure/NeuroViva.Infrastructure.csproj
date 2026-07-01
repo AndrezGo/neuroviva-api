@@ -10,6 +10,7 @@
     <ProjectReference Include="..\NeuroViva.Application\NeuroViva.Application.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="MediatR" Version="12.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.*" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.*" />
     <PackageReference Include="Dapper" Version="2.*" />

@@ -1,4 +1,5 @@
 using NeuroViva.Domain.Appointments.Enums;
+using NeuroViva.Domain.Appointments.Events;
 using NeuroViva.Domain.Common;
 using NeuroViva.Domain.Exceptions;
 
@@ -48,9 +49,38 @@ public sealed class Appointment : AggregateRoot<Guid>
 
     public void Cancel()
     {
+        // Idempotent: already cancelled — skip re-emitting the event.
+        if (Status == AppointmentStatus.Cancelled)
+            return;
+
         if (Status == AppointmentStatus.Completed)
             throw new BusinessRuleViolationException("appointment.invalid_transition",
                 "Completed appointments cannot be cancelled.");
         Status = AppointmentStatus.Cancelled;
+        RaiseEvent(new AppointmentCancelledDomainEvent(Id, PatientId, Type.ToString(), ScheduledAt));
+    }
+
+    public DomainResult MarkAsAttended()
+    {
+        if (Status != AppointmentStatus.Scheduled && Status != AppointmentStatus.Confirmed)
+            return DomainResult.ValidationError("Appointment.InvalidTransition",
+                "Solo se puede marcar como asistida una cita programada o confirmada.");
+        if (ScheduledAt > DateTime.UtcNow)
+            return DomainResult.ValidationError("Appointment.NotYetOccurred", "La cita aún no ha ocurrido.");
+        Status = AppointmentStatus.Attended;
+        RaiseEvent(new AppointmentAttendedDomainEvent(Id, PatientId));
+        return DomainResult.Ok;
+    }
+
+    public DomainResult MarkAsMissed(AppointmentMissReason reason)
+    {
+        if (Status != AppointmentStatus.Scheduled && Status != AppointmentStatus.Confirmed)
+            return DomainResult.ValidationError("Appointment.InvalidTransition",
+                "Solo se puede marcar como no asistida una cita programada o confirmada.");
+        if (ScheduledAt >= DateTime.UtcNow)
+            return DomainResult.ValidationError("Appointment.NotYetOccurred", "La cita aún no ha ocurrido.");
+        Status = AppointmentStatus.Missed;
+        RaiseEvent(new AppointmentMissedDomainEvent(Id, PatientId, Type.ToString(), ScheduledAt, reason));
+        return DomainResult.Ok;
     }
 }

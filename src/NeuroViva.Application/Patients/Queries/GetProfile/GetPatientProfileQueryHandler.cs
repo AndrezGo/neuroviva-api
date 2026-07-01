@@ -12,15 +12,18 @@ public sealed class GetPatientProfileQueryHandler
     private readonly ICurrentUserService _currentUser;
     private readonly IPatientRepository _patientRepo;
     private readonly IDiseaseRepository _diseaseRepo;
+    private readonly IPatientDiseaseRepository _patientDiseaseRepo;
 
     public GetPatientProfileQueryHandler(
         ICurrentUserService currentUser,
         IPatientRepository patientRepo,
-        IDiseaseRepository diseaseRepo)
+        IDiseaseRepository diseaseRepo,
+        IPatientDiseaseRepository patientDiseaseRepo)
     {
         _currentUser = currentUser;
         _patientRepo = patientRepo;
         _diseaseRepo = diseaseRepo;
+        _patientDiseaseRepo = patientDiseaseRepo;
     }
 
     public async Task<Result<PatientProfileDto>> Handle(
@@ -37,11 +40,13 @@ public sealed class GetPatientProfileQueryHandler
         if (patient is null)
             return Error.NotFound("patient.profile_not_found", "No patient profile linked to this user");
 
-        string? conditionName = null;
-        if (patient.DiseaseId.HasValue)
+        var patientDiseases = await _patientDiseaseRepo.ListByPatientAsync(patient.Id, cancellationToken);
+        var conditionNames = new List<string>();
+        foreach (var pd in patientDiseases)
         {
-            var disease = await _diseaseRepo.GetByIdAsync(patient.DiseaseId.Value, cancellationToken);
-            conditionName = disease?.Name;
+            var disease = await _diseaseRepo.GetByIdAsync(pd.DiseaseId, cancellationToken);
+            if (disease is not null)
+                conditionNames.Add(disease.Name);
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -54,7 +59,7 @@ public sealed class GetPatientProfileQueryHandler
             Name: patient.Name,
             DocumentNumber: patient.DocumentNumber,
             Age: age,
-            Condition: conditionName,
+            Conditions: conditionNames,
             DateOfBirth: patient.DateOfBirth);
     }
 

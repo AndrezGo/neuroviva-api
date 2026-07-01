@@ -39,6 +39,13 @@ public sealed class SyncUserCommandHandler : IRequestHandler<SyncUserCommand, Re
         var existing = await _userRepo.GetByAuthUserIdAsync(request.AuthUserId, cancellationToken);
         if (existing is not null)
         {
+            if (request.Name is not null && existing.Name == existing.Email)
+            {
+                existing.UpdateName(request.Name);
+                _userRepo.Update(existing);
+                await _uow.SaveChangesAsync(cancellationToken);
+            }
+
             var existingDto = await _readRepo.GetCurrentUserDtoAsync(existing.Id, cancellationToken);
             return existingDto!;
         }

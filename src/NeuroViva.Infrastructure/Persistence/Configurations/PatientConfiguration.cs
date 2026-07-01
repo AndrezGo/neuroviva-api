@@ -34,7 +34,6 @@ public sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         builder.HasKey(p => p.Id);
         builder.Property(p => p.Id).HasColumnName("id");
         builder.Property(p => p.TenantId).HasColumnName("tenant_id");
-        builder.Property(p => p.DiseaseId).HasColumnName("disease_id");
         builder.Property(p => p.Name).HasColumnName("name").IsRequired();
         builder.Property(p => p.DocumentNumber)
             .HasColumnName("document_number")
@@ -46,6 +45,13 @@ public sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
             .HasConversion(v => ToDbValue(v), v => FromDbValue(v));
         builder.Property(p => p.CreatedAt).HasColumnName("created_at");
         builder.Ignore(p => p.DomainEvents);
+
+        // Diseases is in-memory domain bookkeeping only (mutated via Patient.SetDiseases).
+        // Persistence always goes through IPatientDiseaseRepository, never through this
+        // navigation — ignoring it here prevents EF's change tracker from independently
+        // syncing PatientDisease rows and racing with the repository's own delete/insert,
+        // which was causing DbUpdateConcurrencyException ("0 rows affected") on updates.
+        builder.Ignore(p => p.Diseases);
 
         // Unique composite index: (tenant_id, document_number)
         // Domain always normalises document_number to UPPER, matching the DB-level UPPER() functional index.

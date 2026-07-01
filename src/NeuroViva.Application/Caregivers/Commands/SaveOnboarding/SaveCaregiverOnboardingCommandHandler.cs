@@ -18,6 +18,7 @@ public sealed class SaveCaregiverOnboardingCommandHandler
     private readonly IDiseaseRepository _diseaseRepo;
     private readonly IPatientRepository _patientRepo;
     private readonly IPatientCaregiverRepository _patientCaregiverRepo;
+    private readonly IPatientDiseaseRepository _patientDiseaseRepo;
     private readonly IUnitOfWork _uow;
 
     public SaveCaregiverOnboardingCommandHandler(
@@ -26,6 +27,7 @@ public sealed class SaveCaregiverOnboardingCommandHandler
         IDiseaseRepository diseaseRepo,
         IPatientRepository patientRepo,
         IPatientCaregiverRepository patientCaregiverRepo,
+        IPatientDiseaseRepository patientDiseaseRepo,
         IUnitOfWork uow)
     {
         _currentUser = currentUser;
@@ -33,6 +35,7 @@ public sealed class SaveCaregiverOnboardingCommandHandler
         _diseaseRepo = diseaseRepo;
         _patientRepo = patientRepo;
         _patientCaregiverRepo = patientCaregiverRepo;
+        _patientDiseaseRepo = patientDiseaseRepo;
         _uow = uow;
     }
 
@@ -64,12 +67,18 @@ public sealed class SaveCaregiverOnboardingCommandHandler
             _caregiverRepo.Update(caregiver);
         }
 
-        // 3. Resolve Disease (slug lookup → name fallback → null if catalog not seeded yet)
-        var slug = request.Condition.Trim().ToLowerInvariant();
-        var disease = await _diseaseRepo.GetBySlugAsync(slug, cancellationToken)
-                      ?? await _diseaseRepo.GetByNameAsync(request.Condition.Trim(), cancellationToken);
-        // disease may be null when the catalog table is not yet seeded;
-        // the patient is still created — diseaseId gets populated later.
+        // 3. Resolve Diseases (slug lookup → name fallback → skipped if catalog not seeded yet)
+        var diseaseIds = new List<Guid>();
+        foreach (var condition in request.Conditions)
+        {
+            var slug = condition.Trim().ToLowerInvariant();
+            var disease = await _diseaseRepo.GetBySlugAsync(slug, cancellationToken)
+                          ?? await _diseaseRepo.GetByNameAsync(condition.Trim(), cancellationToken);
+            // disease may be null when the catalog table is not yet seeded;
+            // the patient is still created — unresolved conditions are simply skipped.
+            if (disease is not null)
+                diseaseIds.Add(disease.Id);
+        }
 
         // 4. Resolve date_of_birth — prefer explicit DOB; fall back to age-derived for retro-compat; null otherwise
         DateOnly? dateOfBirth = request.PatientDateOfBirth
@@ -90,17 +99,21 @@ public sealed class SaveCaregiverOnboardingCommandHandler
                 tenantId: tenantId,
                 name: request.PatientName,
                 documentNumber: request.DocumentNumber,
-                diseaseId: disease?.Id,
+                diseaseIds: diseaseIds,
                 dateOfBirth: dateOfBirth);
 
             await _patientRepo.AddAsync(patient, cancellationToken);
+            await _patientDiseaseRepo.ReplaceForPatientAsync(patient.Id, diseaseIds, cancellationToken);
         }
         else
         {
             // Only update profile data if the patient has not yet claimed their account.
-            var updated = patient.UpdateProfileIfUnclaimed(request.PatientName, disease?.Id, dateOfBirth);
+            var updated = patient.UpdateProfileIfUnclaimed(request.PatientName, diseaseIds, dateOfBirth);
             if (updated)
+            {
                 _patientRepo.Update(patient);
+                await _patientDiseaseRepo.ReplaceForPatientAsync(patient.Id, diseaseIds, cancellationToken);
+            }
         }
 
         // 7. Find or create the patient-caregiver link to avoid duplicates.

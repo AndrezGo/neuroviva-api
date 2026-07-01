@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using NeuroViva.Domain.Appointments;
+using NeuroViva.Domain.Appointments.Enums;
 using NeuroViva.Domain.Appointments.Repositories;
 using NeuroViva.Infrastructure.Persistence;
 
@@ -24,6 +25,14 @@ public sealed class AppointmentRepository : IAppointmentRepository
         => await _db.Appointments
             .AsNoTracking()
             .Where(a => a.DoctorId == doctorId)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<Appointment>> ListPendingOutcomeByPatientAsync(
+        Guid patientId, DateTime scheduledBefore, CancellationToken ct = default)
+        => await _db.Appointments
+            .Where(a => a.PatientId == patientId
+                     && (a.Status == AppointmentStatus.Scheduled || a.Status == AppointmentStatus.Confirmed)
+                     && a.ScheduledAt < scheduledBefore)
             .ToListAsync(ct);
 
     public async Task AddAsync(Appointment appointment, CancellationToken ct = default)

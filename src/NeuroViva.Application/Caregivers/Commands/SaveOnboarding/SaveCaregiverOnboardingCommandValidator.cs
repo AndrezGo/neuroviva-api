@@ -18,7 +18,10 @@ public sealed class SaveCaregiverOnboardingCommandValidator : AbstractValidator<
             .MaximumLength(100)
             .When(x => x.Relation is not null);
 
-        RuleFor(x => x.Condition)
+        RuleFor(x => x.Conditions)
+            .NotNull();
+
+        RuleForEach(x => x.Conditions)
             .NotEmpty();
 
         RuleFor(x => x.DocumentNumber)

@@ -47,16 +47,20 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 x.Patient.Id,
                 x.Patient.Name,
                 x.Patient.DateOfBirth,
-                DiseaseName = x.Patient.DiseaseId == null
-                    ? null
-                    : _db.Diseases
-                        .Where(d => d.Id == x.Patient.DiseaseId)
-                        .Select(d => d.Name)
-                        .FirstOrDefault()
             })
             .FirstOrDefaultAsync(ct);
 
         if (row is null) return null;
+
+        var conditions = await _db.PatientDiseases
+            .AsNoTracking()
+            .Where(pd => pd.PatientId == row.Id)
+            .Join(
+                _db.Diseases,
+                pd => pd.DiseaseId,
+                d => d.Id,
+                (pd, d) => d.Name)
+            .ToListAsync(ct);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var age = row.DateOfBirth.HasValue
@@ -68,7 +72,7 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             Name: row.Name,
             Age: age,
             DateOfBirth: row.DateOfBirth?.ToString("yyyy-MM-dd"),
-            Condition: row.DiseaseName ?? string.Empty,
+            Conditions: conditions,
             // ConditionStage is always null in v1 — schema has no stage column.
             ConditionStage: null);
     }
@@ -265,12 +269,17 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 ? a.Notes.Split('\n')[0].Trim()
                 : char.ToUpperInvariant(typeStr[0]) + typeStr[1..].ToLowerInvariant();
 
+            var requiresOutcome =
+                (a.Status == AppointmentStatus.Scheduled || a.Status == AppointmentStatus.Confirmed)
+                && a.ScheduledAt < now;
+
             return new AppointmentListItemDto(
                 Id: a.Id,
                 Title: title,
                 Type: typeStr.ToLowerInvariant(),
                 ScheduledAt: a.ScheduledAt.ToString("o"),
-                Status: a.Status.ToString().ToLowerInvariant());
+                Status: a.Status.ToString().ToLowerInvariant(),
+                RequiresOutcome: requiresOutcome);
         }).ToList();
     }
 

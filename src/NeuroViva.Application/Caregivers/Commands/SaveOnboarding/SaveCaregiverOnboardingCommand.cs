@@ -8,6 +8,6 @@ public sealed record SaveCaregiverOnboardingCommand(
     int? PatientAge,
     DateOnly? PatientDateOfBirth,
     string? Relation,
-    string Condition,
+    IReadOnlyList<string> Conditions,
     string DocumentNumber
 ) : IRequest<Result<SaveCaregiverOnboardingResult>>;

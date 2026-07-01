@@ -8,7 +8,6 @@ namespace NeuroViva.Domain.Patients;
 public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
 {
     public Guid TenantId { get; private set; }
-    public Guid? DiseaseId { get; private set; }
     public string Name { get; private set; } = default!;
     public string DocumentNumber { get; private set; } = default!;
     public Guid? UserId { get; private set; }
@@ -25,13 +24,19 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
     private readonly List<ClinicalRecord> _clinicalRecords = new();
     public IReadOnlyCollection<ClinicalRecord> ClinicalRecords => _clinicalRecords.AsReadOnly();
 
+    private readonly List<PatientDisease> _diseases = new();
+    public IReadOnlyCollection<PatientDisease> Diseases => _diseases.AsReadOnly();
+
+    public IReadOnlyCollection<Guid> DiseaseIds =>
+        _diseases.Select(d => d.DiseaseId).ToList().AsReadOnly();
+
     private Patient() { }
 
     public static Patient Create(
         Guid tenantId,
         string name,
         string documentNumber,
-        Guid? diseaseId = null,
+        IEnumerable<Guid>? diseaseIds = null,
         DateOnly? dateOfBirth = null,
         Guid? userId = null)
     {
@@ -47,12 +52,14 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
             TenantId = tenantId,
             Name = name.Trim(),
             DocumentNumber = documentNumber.Trim().ToUpperInvariant(),
-            DiseaseId = diseaseId,
             DateOfBirth = dateOfBirth,
             Status = PatientStatus.Active,
             UserId = userId,
             CreatedAt = DateTime.UtcNow
         };
+
+        if (diseaseIds is not null)
+            patient.SetDiseases(diseaseIds);
 
         patient.RaiseEvent(new PatientCreatedDomainEvent(patient.Id, tenantId));
         return patient;
@@ -74,30 +81,29 @@ public sealed class Patient : AggregateRoot<Guid>, ITenantOwned
     }
 
     /// <summary>
-    /// Updates name, disease and date of birth only when the patient has not yet claimed
+    /// Updates name, diseases and date of birth only when the patient has not yet claimed
     /// their own account (UserId is null). Returns true if the update was applied.
+    /// Empty collection is valid (means "no conditions specified").
     /// </summary>
-    public bool UpdateProfileIfUnclaimed(string name, Guid? diseaseId, DateOnly? dateOfBirth)
+    public bool UpdateProfileIfUnclaimed(string name, IEnumerable<Guid> diseaseIds, DateOnly? dateOfBirth)
     {
         if (UserId is not null)
             return false;
 
         Name = name;
-        DiseaseId = diseaseId;
         DateOfBirth = dateOfBirth;
+        SetDiseases(diseaseIds);
         return true;
-    }
-
-    [Obsolete("Use UpdateProfileIfUnclaimed for caregiver-driven onboarding updates.")]
-    public void UpdateOnboardingInfo(string name, Guid? diseaseId, DateOnly? dateOfBirth)
-    {
-        Name = name;
-        DiseaseId = diseaseId;
-        DateOfBirth = dateOfBirth;
-        Status = PatientStatus.Active;
     }
 
     public void Deactivate() => Status = PatientStatus.Inactive;
 
     public void Discharge() => Status = PatientStatus.Discharged;
+
+    private void SetDiseases(IEnumerable<Guid> diseaseIds)
+    {
+        _diseases.Clear();
+        foreach (var diseaseId in diseaseIds.Distinct())
+            _diseases.Add(PatientDisease.Assign(Id, diseaseId));
+    }
 }

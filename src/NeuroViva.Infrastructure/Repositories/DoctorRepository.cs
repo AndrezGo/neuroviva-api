@@ -19,4 +19,7 @@ public sealed class DoctorRepository : IDoctorRepository
 
     public async Task<Doctor?> GetByMedicalLicenseAsync(string medicalLicense, CancellationToken ct = default)
         => await _db.Doctors.FirstOrDefaultAsync(d => d.MedicalLicense == medicalLicense, ct);
+
+    public async Task AddAsync(Doctor doctor, CancellationToken ct = default)
+        => await _db.Doctors.AddAsync(doctor, ct);
 }

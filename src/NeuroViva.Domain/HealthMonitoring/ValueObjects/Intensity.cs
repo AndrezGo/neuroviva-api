@@ -18,7 +18,7 @@ public sealed class Intensity : ValueObject
         return new Intensity(value);
     }
 
-    public bool IsHigh => Value >= 8;
+    public bool IsHigh => Value >= 7;
 
     protected override IEnumerable<object?> GetEqualityComponents()
     {

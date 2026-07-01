@@ -9,6 +9,8 @@ using NeuroViva.Application.Doctors.Commands.ResolveAlert;
 using NeuroViva.Application.Doctors.Queries.GetDoctorAlerts;
 using NeuroViva.Application.Doctors.Queries.GetDoctorPatients;
 using NeuroViva.Application.Doctors.Queries.GetDoctors;
+using NeuroViva.Application.Doctors.Commands.CompleteOnboarding;
+using NeuroViva.Application.Doctors.Queries.GetMyDoctorProfile;
 using NeuroViva.Application.Doctors.Queries.LookupDoctor;
 
 namespace NeuroViva.Api.Controllers.V1;
@@ -167,4 +169,71 @@ public sealed class DoctorController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    /// <summary>
+    /// Completes the onboarding for the authenticated doctor.
+    /// Returns 201 when the profile is created, 200 when it already existed with the same data.
+    /// </summary>
+    [HttpPost("onboarding")]
+    [Authorize(Policy = Policies.DoctorOnly)]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CompleteOnboarding(
+        [FromBody] DoctorOnboardingRequest body,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(
+            new CompleteDoctorOnboardingCommand(
+                body.Specialty,
+                body.MedicalLicense,
+                body.FirstName,
+                body.LastName), ct);
+
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.Conflict => Conflict(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        if (result.Value.AlreadyOnboarded)
+            return Ok(result.Value);
+
+        return CreatedAtAction(nameof(GetMyProfile), result.Value);
+    }
+
+    /// <summary>
+    /// Returns the doctor profile of the authenticated doctor.
+    /// </summary>
+    [HttpGet("me")]
+    [Authorize(Policy = Policies.DoctorOnly)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMyProfile(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetMyDoctorProfileQuery(), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
+    }
+
 }
+
+public sealed record DoctorOnboardingRequest(
+    string Specialty,
+    string MedicalLicense,
+    string FirstName,
+    string LastName);

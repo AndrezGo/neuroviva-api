@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Domain.Ai;
 using NeuroViva.Domain.Ai.Enums;
 using NeuroViva.Domain.Ai.Repositories;
@@ -9,8 +10,13 @@ namespace NeuroViva.Infrastructure.Repositories;
 public sealed class AlertRepository : IAlertRepository
 {
     private readonly NeuroVivaDbContext _db;
+    private readonly IClock _clock;
 
-    public AlertRepository(NeuroVivaDbContext db) => _db = db;
+    public AlertRepository(NeuroVivaDbContext db, IClock clock)
+    {
+        _db = db;
+        _clock = clock;
+    }
 
     public async Task<Alert?> GetByIdAsync(Guid id, CancellationToken ct = default)
         => await _db.Alerts.FirstOrDefaultAsync(a => a.Id == id, ct);
@@ -40,6 +46,22 @@ public sealed class AlertRepository : IAlertRepository
 
     public void Update(Alert alert)
         => _db.Alerts.Update(alert);
+
+    public async Task<bool> ExistsRecentAsync(
+        Guid patientId, string type, AlertPriority priority, TimeSpan window, CancellationToken ct = default)
+    {
+        var cutoff = _clock.UtcNow - window;
+        return await _db.Alerts.AnyAsync(
+            a => a.PatientId == patientId
+                 && a.Type == type
+                 && a.Priority == priority
+                 && !a.Resolved
+                 && a.CreatedAt > cutoff,
+            ct);
+    }
+
+    public async Task<bool> ExistsForSourceAsync(Guid sourceReferenceId, CancellationToken ct = default)
+        => await _db.Alerts.AnyAsync(a => a.SourceReferenceId == sourceReferenceId, ct);
 
     private static int PriorityRank(AlertPriority priority) => priority switch
     {

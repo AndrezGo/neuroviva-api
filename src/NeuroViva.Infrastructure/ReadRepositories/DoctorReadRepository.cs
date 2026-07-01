@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using NeuroViva.Application.Caregivers.Queries.GetPatientDoctor;
-using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Doctors;
 using NeuroViva.Application.Doctors.Queries.GetDoctorAlerts;
 using NeuroViva.Application.Doctors.Queries.GetDoctorPatients;
@@ -14,27 +13,25 @@ namespace NeuroViva.Infrastructure.ReadRepositories;
 public sealed class DoctorReadRepository : IDoctorReadRepository
 {
     private readonly NeuroVivaDbContext _db;
-    private readonly ITenantContext _tenantContext;
 
-    public DoctorReadRepository(NeuroVivaDbContext db, ITenantContext tenantContext)
+    public DoctorReadRepository(NeuroVivaDbContext db)
     {
         _db = db;
-        _tenantContext = tenantContext;
     }
 
     public async Task<IReadOnlyList<DoctorPatientDto>> ListPatientsAsync(
         Guid doctorId,
         CancellationToken ct = default)
     {
-        var tenantId = _tenantContext.TenantId;
-        if (tenantId is null) return Array.Empty<DoctorPatientDto>();
+        // No tenant guard — DoctorId is the security boundary for doctors (they are cross-tenant).
+        // IgnoreQueryFilters bypasses any global TenantId filter on Patients.
 
         // Step 1: Load patients linked to this doctor (active links + active patients only)
         var patientRows = await _db.PatientDoctors
             .AsNoTracking()
             .Where(pd => pd.DoctorId == doctorId && pd.IsActive)
             .Join(
-                _db.Patients.Where(p => p.TenantId == tenantId.Value && p.Status == PatientStatus.Active),
+                _db.Patients.IgnoreQueryFilters().Where(p => p.Status == PatientStatus.Active),
                 pd => pd.PatientId,
                 p => p.Id,
                 (pd, p) => new
@@ -42,12 +39,6 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
                     p.Id,
                     p.Name,
                     p.DateOfBirth,
-                    DiseaseName = p.DiseaseId == null
-                        ? null
-                        : _db.Diseases
-                            .Where(d => d.Id == p.DiseaseId)
-                            .Select(d => d.Name)
-                            .FirstOrDefault()
                 })
             .ToListAsync(ct);
 
@@ -56,6 +47,21 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
 
         // Step 2: Load unresolved alert priorities for those patients under this doctor
         var patientIds = patientRows.Select(r => r.Id).ToList();
+
+        // Step 1b: Load condition names for those patients, grouped by patient
+        var conditionRows = await _db.PatientDiseases
+            .AsNoTracking()
+            .Where(pd => patientIds.Contains(pd.PatientId))
+            .Join(
+                _db.Diseases,
+                pd => pd.DiseaseId,
+                d => d.Id,
+                (pd, d) => new { pd.PatientId, DiseaseName = d.Name })
+            .ToListAsync(ct);
+
+        var conditionsByPatient = conditionRows
+            .GroupBy(r => r.PatientId)
+            .ToDictionary(g => g.Key, g => g.Select(r => r.DiseaseName).ToList());
 
         var alertPriorities = await _db.Alerts
             .AsNoTracking()
@@ -117,10 +123,14 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
 
             var lastActivity = lastActivityByPatient.TryGetValue(row.Id, out var la) ? la : null;
 
+            var conditions = conditionsByPatient.TryGetValue(row.Id, out var c)
+                ? c
+                : new List<string>();
+
             return new DoctorPatientDto(
                 PatientId: row.Id,
                 Name: row.Name,
-                Condition: row.DiseaseName,
+                Conditions: conditions,
                 ConditionStage: null,
                 Age: age,
                 HighestAlertPriority: highestAlertPriority,
@@ -133,8 +143,8 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
         bool includeResolved = false,
         CancellationToken ct = default)
     {
-        var tenantId = _tenantContext.TenantId;
-        if (tenantId is null) return Array.Empty<DoctorAlertDto>();
+        // No tenant guard — DoctorId scopes the alerts already.
+        // IgnoreQueryFilters bypasses any global TenantId filter on Patients.
 
         var query = _db.Alerts
             .AsNoTracking()
@@ -145,7 +155,7 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
 
         var rows = await query
             .Join(
-                _db.Patients.Where(p => p.TenantId == tenantId.Value),
+                _db.Patients.IgnoreQueryFilters(),
                 a => a.PatientId,
                 p => p.Id,
                 (a, p) => new
@@ -180,35 +190,65 @@ public sealed class DoctorReadRepository : IDoctorReadRepository
 
     public async Task<IReadOnlyList<DoctorListItemDto>> ListAllAsync(CancellationToken ct = default)
     {
-        return await _db.Doctors
+        // Two separate queries + in-memory merge avoids EF Core cross-DbSet JOIN translation issues.
+        // IgnoreQueryFilters on Users because doctor User records may belong to a different tenant.
+        var doctors = await _db.Doctors
             .AsNoTracking()
-            .Join(
-                _db.Users,
-                d => d.UserId,
-                u => u.Id,
-                (d, u) => new DoctorListItemDto(d.Id, u.Name, d.Specialty, d.MedicalLicense))
-            .OrderBy(dto => dto.Name)
+            .Select(d => new { d.Id, d.UserId, d.Specialty, d.MedicalLicense })
             .ToListAsync(ct);
+
+        if (doctors.Count == 0) return Array.Empty<DoctorListItemDto>();
+
+        var userIds = doctors.Select(d => d.UserId).ToList();
+        var users = await _db.Users
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Name })
+            .ToListAsync(ct);
+
+        var userById = users.ToDictionary(u => u.Id, u => u.Name);
+
+        return doctors
+            .Select(d => new DoctorListItemDto(
+                DoctorId: d.Id,
+                Name: userById.TryGetValue(d.UserId, out var name) ? name : "—",
+                Specialty: d.Specialty,
+                MedicalLicense: d.MedicalLicense))
+            .OrderBy(dto => dto.Name)
+            .ToList();
     }
 
     public async Task<PatientDoctorDto?> GetCurrentDoctorForPatientAsync(
         Guid patientId,
         CancellationToken ct = default)
     {
-        return await _db.PatientDoctors
+        var link = await _db.PatientDoctors
             .AsNoTracking()
             .Where(pd => pd.PatientId == patientId && pd.IsActive)
-            .Join(
-                _db.Doctors,
-                pd => pd.DoctorId,
-                d => d.Id,
-                (pd, d) => new { d.Id, d.UserId, d.Specialty, d.MedicalLicense })
-            .Join(
-                _db.Users,
-                x => x.UserId,
-                u => u.Id,
-                (x, u) => new PatientDoctorDto(x.Id, u.Name, x.Specialty, x.MedicalLicense))
+            .Select(pd => new { pd.DoctorId })
             .FirstOrDefaultAsync(ct);
+
+        if (link is null) return null;
+
+        var doctor = await _db.Doctors
+            .AsNoTracking()
+            .Where(d => d.Id == link.DoctorId)
+            .Select(d => new { d.Id, d.UserId, d.Specialty, d.MedicalLicense })
+            .FirstOrDefaultAsync(ct);
+
+        if (doctor is null) return null;
+
+        var user = await _db.Users
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(u => u.Id == doctor.UserId)
+            .Select(u => new { u.Name })
+            .FirstOrDefaultAsync(ct);
+
+        return user is null
+            ? null
+            : new PatientDoctorDto(doctor.Id, user.Name, doctor.Specialty, doctor.MedicalLicense);
     }
 
     private static int PriorityRank(AlertPriority priority) => priority switch

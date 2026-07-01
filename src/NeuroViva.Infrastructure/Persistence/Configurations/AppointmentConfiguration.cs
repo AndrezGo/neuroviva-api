@@ -7,22 +7,26 @@ namespace NeuroViva.Infrastructure.Persistence.Configurations;
 
 public sealed class AppointmentConfiguration : IEntityTypeConfiguration<Appointment>
 {
-    // cita_estado_check: programada, confirmada, realizada, cancelada
+    // cita_estado_check: programada, confirmada, realizada, cancelada, asistio, no_asistio
     private static string StatusToDb(AppointmentStatus v)
     {
         if (v == AppointmentStatus.Scheduled)  return "programada";
         if (v == AppointmentStatus.Confirmed)  return "confirmada";
         if (v == AppointmentStatus.Completed)  return "realizada";
         if (v == AppointmentStatus.Cancelled)  return "cancelada";
+        if (v == AppointmentStatus.Attended)   return "asistio";
+        if (v == AppointmentStatus.Missed)     return "no_asistio";
         throw new ArgumentOutOfRangeException(nameof(v), v, "Unmapped AppointmentStatus value.");
     }
 
     private static AppointmentStatus StatusFromDb(string v)
     {
-        if (v == "programada") return AppointmentStatus.Scheduled;
-        if (v == "confirmada") return AppointmentStatus.Confirmed;
-        if (v == "realizada")  return AppointmentStatus.Completed;
-        if (v == "cancelada")  return AppointmentStatus.Cancelled;
+        if (v == "programada")  return AppointmentStatus.Scheduled;
+        if (v == "confirmada")  return AppointmentStatus.Confirmed;
+        if (v == "realizada")   return AppointmentStatus.Completed;
+        if (v == "cancelada")   return AppointmentStatus.Cancelled;
+        if (v == "asistio")     return AppointmentStatus.Attended;
+        if (v == "no_asistio")  return AppointmentStatus.Missed;
         throw new ArgumentOutOfRangeException(nameof(v), v, "Unknown AppointmentStatus DB value.");
     }
 

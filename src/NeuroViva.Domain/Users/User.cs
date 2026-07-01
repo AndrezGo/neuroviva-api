@@ -34,4 +34,5 @@ public sealed class User : AggregateRoot<Guid>, ITenantOwned
     public void Deactivate() => IsActive = false;
     public void Activate() => IsActive = true;
     public void UpdateAvatar(string url) => AvatarUrl = url;
+    public void UpdateName(string name) => Name = name;
 }

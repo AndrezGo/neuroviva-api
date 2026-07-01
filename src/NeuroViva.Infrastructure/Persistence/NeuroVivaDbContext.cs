@@ -1,11 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using NeuroViva.Application.Common.Abstractions;
+using NeuroViva.Application.Common.Exceptions;
 using NeuroViva.Domain.Abstractions;
 using NeuroViva.Domain.Ai;
 using NeuroViva.Domain.Appointments;
 using NeuroViva.Domain.Billing;
 using NeuroViva.Domain.Catalog;
+using NeuroViva.Domain.Common;
 using NeuroViva.Domain.Community;
 using NeuroViva.Domain.Content;
 using NeuroViva.Domain.HealthMonitoring;
@@ -21,9 +23,17 @@ namespace NeuroViva.Infrastructure.Persistence;
 public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
 {
     private readonly ITenantContext _tenantContext;
+    private readonly IDomainEventDispatcher _dispatcher;
 
-    public NeuroVivaDbContext(DbContextOptions<NeuroVivaDbContext> options, ITenantContext tenantContext)
-        : base(options) => _tenantContext = tenantContext;
+    public NeuroVivaDbContext(
+        DbContextOptions<NeuroVivaDbContext> options,
+        ITenantContext tenantContext,
+        IDomainEventDispatcher dispatcher)
+        : base(options)
+    {
+        _tenantContext = tenantContext;
+        _dispatcher = dispatcher;
+    }
 
     // Billing
     public DbSet<Tenant> Tenants => Set<Tenant>();
@@ -52,6 +62,7 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<PatientDoctor> PatientDoctors => Set<PatientDoctor>();
     public DbSet<PatientCaregiver> PatientCaregivers => Set<PatientCaregiver>();
     public DbSet<ClinicalRecord> ClinicalRecords => Set<ClinicalRecord>();
+    public DbSet<PatientDisease> PatientDiseases => Set<PatientDisease>();
 
     // Medications
     public DbSet<Medication> Medications => Set<Medication>();
@@ -91,6 +102,51 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<StoreTag> StoreTags => Set<StoreTag>();
     public DbSet<StoreReport> StoreReports => Set<StoreReport>();
 
+    public override int SaveChanges()
+        => throw new NotSupportedException("Use SaveChangesAsync instead.");
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        => throw new NotSupportedException("Use SaveChangesAsync instead.");
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        // Collect all pending domain events before saving so that the second
+        // SaveChangesAsync triggered from within event handlers finds no events
+        // and cannot cause an infinite dispatch loop.
+        var entitiesWithEvents = ChangeTracker
+            .Entries<Entity<Guid>>()
+            .Where(e => e.Entity.DomainEvents.Count > 0)
+            .Select(e => e.Entity)
+            .ToList();
+
+        var events = entitiesWithEvents
+            .SelectMany(e => e.DomainEvents)
+            .ToList();
+
+        // Clear BEFORE persisting so re-entrant SaveChangesAsync calls in
+        // event handlers do not pick up the same events again.
+        foreach (var entity in entitiesWithEvents)
+            entity.ClearDomainEvents();
+
+        int result;
+        try
+        {
+            result = await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            throw new UniqueConstraintViolationException(
+                "A unique constraint was violated.",
+                ExtractConstraintName(ex),
+                ex);
+        }
+
+        if (events.Count > 0)
+            await _dispatcher.DispatchAsync(events, cancellationToken);
+
+        return result;
+    }
+
     public async Task<IUnitOfWorkTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
         var tx = await Database.BeginTransactionAsync(cancellationToken);
@@ -111,6 +167,25 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
             modelBuilder.Entity<Subscription>().HasQueryFilter(e => e.TenantId == tenantId);
             modelBuilder.Entity<PaymentMethod>().HasQueryFilter(e => e.TenantId == tenantId);
         }
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        // PostgreSQL error code 23505 = unique_violation.
+        // Npgsql wraps the PostgresException as InnerException of DbUpdateException.
+        var inner = ex.InnerException?.Message;
+        return inner != null
+            && (inner.Contains("23505", StringComparison.Ordinal)
+                || inner.Contains("unique constraint", StringComparison.OrdinalIgnoreCase)
+                || inner.Contains("duplicate key", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? ExtractConstraintName(DbUpdateException ex)
+    {
+        // Npgsql format: duplicate key value violates unique constraint "constraint_name"
+        var msg = ex.InnerException?.Message ?? ex.Message;
+        var match = System.Text.RegularExpressions.Regex.Match(msg, @"""([^""]+)""");
+        return match.Success ? match.Groups[1].Value : null;
     }
 
     private sealed class EfUnitOfWorkTransaction : IUnitOfWorkTransaction

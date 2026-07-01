@@ -59,11 +59,13 @@ public sealed class LogMedicationDoseCommandHandler
         if (!isLinked)
             return Error.Forbidden("Medication does not belong to a patient linked to this caregiver");
 
-        // Record the dose (taken = true per contract)
+        // Record the dose using the taken flag from the request
         var log = MedicationLog.Record(
             medicationId: request.MedicationId,
             loggedBy: _currentUser.UserId.Value,
-            taken: true,
+            taken: request.Taken ?? true,
+            patientId: medication.PatientId,
+            medicationName: medication.Name,
             notes: request.Notes,
             loggedAt: DateTime.UtcNow);
 

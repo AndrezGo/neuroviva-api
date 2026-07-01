@@ -34,6 +34,7 @@ public sealed class AlertConfiguration : IEntityTypeConfiguration<Alert>
         builder.Property(a => a.PatientId).HasColumnName("patient_id");
         builder.Property(a => a.DoctorId).HasColumnName("doctor_id");
         builder.Property(a => a.AiAnalysisId).HasColumnName("ai_analysis_id");
+        builder.Property(a => a.SourceReferenceId).HasColumnName("source_reference_id");
         builder.Property(a => a.Type).HasColumnName("type");
         builder.Property(a => a.Priority).HasColumnName("priority")
             .HasConversion(v => PriorityToDb(v), v => PriorityFromDb(v));

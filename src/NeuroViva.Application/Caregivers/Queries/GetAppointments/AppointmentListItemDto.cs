@@ -8,6 +8,8 @@ public sealed record AppointmentListItemDto(
     string Type,
     // ISO 8601 UTC datetime string
     string ScheduledAt,
-    // Lowercase enum string: "scheduled", "confirmed", "completed", "cancelled"
-    string Status
+    // Lowercase enum string: "scheduled", "confirmed", "completed", "cancelled", "attended", "missed"
+    string Status,
+    // True when the appointment is past its scheduled time but no outcome has been recorded yet
+    bool RequiresOutcome
 );

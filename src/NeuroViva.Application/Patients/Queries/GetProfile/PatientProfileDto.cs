@@ -5,5 +5,5 @@ public sealed record PatientProfileDto(
     string Name,
     string DocumentNumber,
     int Age,
-    string? Condition,
+    IReadOnlyList<string> Conditions,
     DateOnly? DateOfBirth);

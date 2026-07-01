@@ -1,3 +1,5 @@
+using NeuroViva.Domain.Ai.Enums;
+
 namespace NeuroViva.Domain.Ai.Repositories;
 
 public interface IAiAnalysisRepository
@@ -13,4 +15,6 @@ public interface IAlertRepository
     Task<IReadOnlyList<Alert>> ListByDoctorAsync(Guid doctorId, bool includeResolved = false, CancellationToken ct = default);
     Task AddAsync(Alert alert, CancellationToken ct = default);
     void Update(Alert alert);
+    Task<bool> ExistsRecentAsync(Guid patientId, string type, AlertPriority priority, TimeSpan window, CancellationToken ct = default);
+    Task<bool> ExistsForSourceAsync(Guid sourceReferenceId, CancellationToken ct = default);
 }

@@ -3,6 +3,7 @@ using Mapster;
 using MapsterMapper;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using NeuroViva.Application.Caregivers.Services;
 using NeuroViva.Application.Common.Behaviors;
 
 namespace NeuroViva.Application;
@@ -25,6 +26,9 @@ public static class DependencyInjection
         config.Scan(assembly);
         services.AddSingleton(config);
         services.AddScoped<IMapper, ServiceMapper>();
+
+        // Application services
+        services.AddScoped<IAppointmentReconciliationService, AppointmentReconciliationService>();
 
         return services;
     }

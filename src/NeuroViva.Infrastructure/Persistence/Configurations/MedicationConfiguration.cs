@@ -15,7 +15,8 @@ public sealed class MedicationConfiguration : IEntityTypeConfiguration<Medicatio
         builder.Property(m => m.Name).HasColumnName("name").IsRequired();
         builder.Property(m => m.Dose).HasColumnName("dose").IsRequired();
         builder.Property(m => m.Frequency).HasColumnName("frequency").IsRequired();
-        builder.Property(m => m.IntervalHours).HasColumnName("interval_hours");
+        builder.Property(m => m.PrescribingDoctorName).HasColumnName("prescribing_doctor_name");
+        builder.Property(m => m.Notes).HasColumnName("notes");
         builder.Property(m => m.StartDate).HasColumnName("start_date");
         builder.Property(m => m.EndDate).HasColumnName("end_date");
         builder.Property(m => m.IsActive).HasColumnName("active");

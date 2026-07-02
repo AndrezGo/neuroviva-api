@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
@@ -124,7 +125,6 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 m.Dose,
                 // Free-text frequency — exposed as scheduledTime per contract
                 m.Frequency,
-                m.IntervalHours,
                 // Check for a "taken" log today
                 TakenToday = _db.MedicationLogs
                     .Any(l =>
@@ -147,9 +147,7 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             Dose: m.Dose,
             ScheduledTime: m.Frequency,
             Status: m.TakenToday ? "taken" : "pending",
-            NextDoseAt: m.IntervalHours.HasValue && m.LastTakenAt.HasValue
-                ? m.LastTakenAt.Value.AddHours(m.IntervalHours.Value).ToString("o")
-                : null,
+            NextDoseAt: ComputeNextDoseAt(m.Frequency, m.LastTakenAt),
             // isNow is always false in v1 — no structured schedule exists to determine "is now"
             IsNow: false
         )).ToList();
@@ -511,5 +509,17 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
         var age = today.Year - dateOfBirth.Year;
         if (dateOfBirth > today.AddYears(-age)) age--;
         return age;
+    }
+
+    private static readonly Regex CadaHorasRegex =
+        new(@"cada\s+(\d{1,3})\s*h", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string? ComputeNextDoseAt(string? frequency, DateTime? lastTakenAt)
+    {
+        if (string.IsNullOrWhiteSpace(frequency) || !lastTakenAt.HasValue) return null;
+        var match = CadaHorasRegex.Match(frequency);
+        if (!match.Success) return null;
+        if (!int.TryParse(match.Groups[1].Value, out var hours) || hours <= 0 || hours > 168) return null;
+        return lastTakenAt.Value.AddHours(hours).ToString("o");
     }
 }

@@ -11,6 +11,8 @@ public sealed record CreateMedicationCommand(
     string? StartDate,
     // Optional ISO date string (yyyy-MM-dd).
     string? EndDate,
-    // Optional fixed dosing interval in hours — enables the "next dose" countdown.
-    int? IntervalHours
+    // Optional free-text name of the prescribing doctor.
+    string? PrescribingDoctorName,
+    // Optional free-text notes about the medication.
+    string? Notes
 ) : IRequest<Result<CreateMedicationResult>>;

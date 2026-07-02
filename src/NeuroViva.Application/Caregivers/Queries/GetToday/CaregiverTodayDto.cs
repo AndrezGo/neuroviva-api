@@ -15,8 +15,8 @@ public sealed record TodayMedicationDto(
     string Status,
     // Always false in v1: no structured schedule exists to determine "is now".
     bool IsNow,
-    // ISO 8601 UTC string. Null unless the medication has a fixed IntervalHours
-    // AND has at least one prior "taken" log to anchor the countdown from.
+    // ISO 8601 UTC string. Null unless the medication's Frequency matches a "cada N horas"
+    // pattern AND has at least one prior "taken" log to anchor the countdown from.
     string? NextDoseAt
 );
 

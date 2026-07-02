@@ -14,7 +14,10 @@ public sealed record TodayMedicationDto(
     // "taken" or "pending". "skipped" is not supported in v1 (no skip semantics in schema).
     string Status,
     // Always false in v1: no structured schedule exists to determine "is now".
-    bool IsNow
+    bool IsNow,
+    // ISO 8601 UTC string. Null unless the medication has a fixed IntervalHours
+    // AND has at least one prior "taken" log to anchor the countdown from.
+    string? NextDoseAt
 );
 
 public sealed record TodayAppointmentDto(

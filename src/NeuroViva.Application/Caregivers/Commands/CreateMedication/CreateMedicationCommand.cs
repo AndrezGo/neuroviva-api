@@ -10,5 +10,7 @@ public sealed record CreateMedicationCommand(
     // Optional ISO date string (yyyy-MM-dd). Defaults to today when null.
     string? StartDate,
     // Optional ISO date string (yyyy-MM-dd).
-    string? EndDate
+    string? EndDate,
+    // Optional fixed dosing interval in hours — enables the "next dose" countdown.
+    int? IntervalHours
 ) : IRequest<Result<CreateMedicationResult>>;

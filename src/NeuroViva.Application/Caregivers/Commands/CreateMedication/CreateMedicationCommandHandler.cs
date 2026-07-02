@@ -65,7 +65,8 @@ public sealed class CreateMedicationCommandHandler
             dose: request.Dose,
             frequency: request.Frequency,
             startDate: startDate,
-            endDate: endDate);
+            endDate: endDate,
+            intervalHours: request.IntervalHours);
 
         await _medicationRepo.AddAsync(medication, cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);

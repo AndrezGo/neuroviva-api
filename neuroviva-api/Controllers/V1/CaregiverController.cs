@@ -254,7 +254,8 @@ public sealed class CaregiverController : ControllerBase
             Dose: request.Dose,
             Frequency: request.Frequency,
             StartDate: request.StartDate,
-            EndDate: request.EndDate);
+            EndDate: request.EndDate,
+            IntervalHours: request.IntervalHours);
 
         var result = await _mediator.Send(command, ct);
 
@@ -585,7 +586,8 @@ public sealed record CreateMedicationRequest(
     string Dose,
     string Frequency,
     string? StartDate,
-    string? EndDate);
+    string? EndDate,
+    int? IntervalHours);
 
 public sealed record CreateAppointmentRequest(
     string Title,

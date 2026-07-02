@@ -124,13 +124,20 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 m.Dose,
                 // Free-text frequency — exposed as scheduledTime per contract
                 m.Frequency,
+                m.IntervalHours,
                 // Check for a "taken" log today
                 TakenToday = _db.MedicationLogs
                     .Any(l =>
                         l.MedicationId == m.Id &&
                         l.Taken &&
                         l.LoggedAt >= todayStart &&
-                        l.LoggedAt < todayEnd)
+                        l.LoggedAt < todayEnd),
+                // Most recent "taken" log overall — anchors the next-dose countdown
+                LastTakenAt = _db.MedicationLogs
+                    .Where(l => l.MedicationId == m.Id && l.Taken)
+                    .OrderByDescending(l => l.LoggedAt)
+                    .Select(l => (DateTime?)l.LoggedAt)
+                    .FirstOrDefault()
             })
             .ToListAsync(ct);
 
@@ -140,6 +147,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             Dose: m.Dose,
             ScheduledTime: m.Frequency,
             Status: m.TakenToday ? "taken" : "pending",
+            NextDoseAt: m.IntervalHours.HasValue && m.LastTakenAt.HasValue
+                ? m.LastTakenAt.Value.AddHours(m.IntervalHours.Value).ToString("o")
+                : null,
             // isNow is always false in v1 — no structured schedule exists to determine "is now"
             IsNow: false
         )).ToList();

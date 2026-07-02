@@ -27,6 +27,10 @@ public sealed class CreateMedicationCommandValidator : AbstractValidator<CreateM
             .Must(BeValidDateOnly)
             .WithMessage("endDate must be a valid date in yyyy-MM-dd format.")
             .When(x => x.EndDate is not null);
+
+        RuleFor(x => x.IntervalHours)
+            .InclusiveBetween(1, 168)
+            .When(x => x.IntervalHours.HasValue);
     }
 
     private static bool BeValidDateOnly(string? value)

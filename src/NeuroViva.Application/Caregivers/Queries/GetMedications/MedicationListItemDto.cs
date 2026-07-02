@@ -12,5 +12,7 @@ public sealed record MedicationListItemDto(
     string? EndDate,
     // ISO 8601 UTC datetime string
     string CreatedAt,
-    bool TakenToday
+    bool TakenToday,
+    string? PrescribingDoctorName,
+    string? Notes
 );

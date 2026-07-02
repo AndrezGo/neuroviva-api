@@ -8,7 +8,9 @@ using NeuroViva.Application.Caregivers.Commands.CancelAppointment;
 using NeuroViva.Application.Caregivers.Commands.SubmitAppointmentOutcome;
 using NeuroViva.Application.Caregivers.Commands.CreateAppointment;
 using NeuroViva.Application.Caregivers.Commands.CreateMedication;
+using NeuroViva.Application.Caregivers.Commands.DiscontinueMedication;
 using NeuroViva.Application.Caregivers.Commands.LogMedicationDose;
+using NeuroViva.Application.Caregivers.Commands.UpdateMedication;
 using NeuroViva.Application.Caregivers.Commands.AssignDoctorToPatient;
 using NeuroViva.Application.Caregivers.Commands.MarkNotificationRead;
 using NeuroViva.Application.Caregivers.Commands.RegisterSymptom;
@@ -269,6 +271,70 @@ public sealed class CaregiverController : ControllerBase
             };
 
         return Ok(new { medicationId = result.Value.MedicationId });
+    }
+
+    /// <summary>
+    /// Updates an existing medication for the caregiver's linked patient.
+    /// The medication must belong to the authenticated caregiver's linked patient.
+    /// </summary>
+    [HttpPatch("medications/{medicationId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateMedication(
+        Guid medicationId,
+        [FromBody] UpdateMedicationRequest request,
+        CancellationToken ct)
+    {
+        var command = new UpdateMedicationCommand(
+            MedicationId: medicationId,
+            Name: request.Name,
+            Dose: request.Dose,
+            Frequency: request.Frequency,
+            StartDate: request.StartDate,
+            EndDate: request.EndDate,
+            PrescribingDoctorName: request.PrescribingDoctorName,
+            Notes: request.Notes);
+
+        var result = await _mediator.Send(command, ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Discontinues (soft-deletes) a medication for the caregiver's linked patient.
+    /// Idempotent: succeeds even when the medication is already inactive.
+    /// </summary>
+    [HttpDelete("medications/{medicationId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DiscontinueMedication(
+        Guid medicationId,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(new DiscontinueMedicationCommand(medicationId), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
     }
 
     /// <summary>
@@ -587,6 +653,15 @@ public sealed record CreateMedicationRequest(
     string Dose,
     string Frequency,
     string? StartDate,
+    string? EndDate,
+    string? PrescribingDoctorName,
+    string? Notes);
+
+public sealed record UpdateMedicationRequest(
+    string Name,
+    string Dose,
+    string Frequency,
+    string StartDate,
     string? EndDate,
     string? PrescribingDoctorName,
     string? Notes);

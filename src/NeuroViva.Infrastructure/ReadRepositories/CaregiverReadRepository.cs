@@ -217,6 +217,8 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 m.StartDate,
                 m.EndDate,
                 m.CreatedAt,
+                m.PrescribingDoctorName,
+                m.Notes,
                 TakenToday = _db.MedicationLogs
                     .Any(l =>
                         l.MedicationId == m.Id &&
@@ -235,7 +237,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             StartDate: m.StartDate.ToString("yyyy-MM-dd"),
             EndDate: m.EndDate?.ToString("yyyy-MM-dd"),
             CreatedAt: m.CreatedAt.ToString("o"),
-            TakenToday: m.TakenToday)).ToList();
+            TakenToday: m.TakenToday,
+            PrescribingDoctorName: m.PrescribingDoctorName,
+            Notes: m.Notes)).ToList();
     }
 
     public async Task<IReadOnlyList<AppointmentListItemDto>> ListAppointmentsAsync(

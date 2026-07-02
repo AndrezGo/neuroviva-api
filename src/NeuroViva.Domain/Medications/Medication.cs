@@ -39,4 +39,22 @@ public sealed class Medication : AggregateRoot<Guid>
     };
 
     public void Discontinue() => IsActive = false;
+
+    public void UpdateDetails(
+        string name,
+        string dose,
+        string frequency,
+        DateOnly startDate,
+        DateOnly? endDate,
+        string? prescribingDoctorName,
+        string? notes)
+    {
+        Name = name;
+        Dose = dose;
+        Frequency = frequency;
+        StartDate = startDate;
+        EndDate = endDate;
+        PrescribingDoctorName = prescribingDoctorName;
+        Notes = notes;
+    }
 }

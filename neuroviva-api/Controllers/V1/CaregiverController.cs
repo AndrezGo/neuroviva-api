@@ -585,20 +585,39 @@ public sealed class CaregiverController : ControllerBase
 
     /// <summary>
     /// Adds a manual clinical note (consultation, exam, note or other) to the patient's history.
+    /// Optionally attach a scanned document or image (max 10 MB; accepted types: image/jpeg, image/png, image/webp, application/pdf).
     /// </summary>
     [HttpPost("history")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(11 * 1024 * 1024)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> AddClinicalNote(
-        [FromBody] AddClinicalNoteRequest request,
+        [FromForm] AddClinicalNoteRequest request,
         CancellationToken ct)
     {
+        byte[]? attachmentBytes = null;
+        string? attachmentFileName = null;
+        string? attachmentContentType = null;
+
+        if (request.Attachment is not null)
+        {
+            using var ms = new MemoryStream();
+            await request.Attachment.CopyToAsync(ms, ct);
+            attachmentBytes = ms.ToArray();
+            attachmentFileName = request.Attachment.FileName;
+            attachmentContentType = request.Attachment.ContentType;
+        }
+
         var command = new AddClinicalNoteCommand(
             EventType: request.EventType,
             Description: request.Description,
-            EventDate: request.EventDate);
+            EventDate: request.EventDate,
+            AttachmentBytes: attachmentBytes,
+            AttachmentFileName: attachmentFileName,
+            AttachmentContentType: attachmentContentType);
 
         var result = await _mediator.Send(command, ct);
 
@@ -742,10 +761,13 @@ public sealed record RegisterSymptomRequest(
 
 public sealed record UpdateSymptomRequest(string Type, int Intensity, string? Description);
 
-public sealed record AddClinicalNoteRequest(
-    string EventType,
-    string Description,
-    DateTime? EventDate);
+public sealed class AddClinicalNoteRequest
+{
+    public string EventType { get; set; } = default!;
+    public string Description { get; set; } = default!;
+    public DateTime? EventDate { get; set; }
+    public IFormFile? Attachment { get; set; }
+}
 
 public sealed record AssignDoctorToPatientRequest(Guid DoctorId);
 

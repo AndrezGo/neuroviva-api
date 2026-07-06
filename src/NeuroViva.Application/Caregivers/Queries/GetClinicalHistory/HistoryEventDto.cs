@@ -6,4 +6,6 @@ public sealed record HistoryEventDto(
     string Title,
     string? Description,
     string EventDate,
-    string? Status);
+    string? Status,
+    string? AttachmentUrl,
+    string? AttachmentFileName);

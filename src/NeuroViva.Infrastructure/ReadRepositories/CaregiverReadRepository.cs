@@ -8,6 +8,8 @@ using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetPatient;
 using NeuroViva.Application.Caregivers.Queries.GetSymptoms;
 using NeuroViva.Application.Caregivers.Queries.GetToday;
+using NeuroViva.Application.Common.Abstractions;
+using NeuroViva.Application.Common.Options;
 using NeuroViva.Domain.Appointments.Enums;
 using NeuroViva.Domain.Patients.Enums;
 using NeuroViva.Infrastructure.Persistence;
@@ -17,8 +19,18 @@ namespace NeuroViva.Infrastructure.ReadRepositories;
 public sealed class CaregiverReadRepository : ICaregiverReadRepository
 {
     private readonly NeuroVivaDbContext _db;
+    private readonly IStorageService _storageService;
+    private readonly StorageOptions _storageOptions;
 
-    public CaregiverReadRepository(NeuroVivaDbContext db) => _db = db;
+    public CaregiverReadRepository(
+        NeuroVivaDbContext db,
+        IStorageService storageService,
+        StorageOptions storageOptions)
+    {
+        _db = db;
+        _storageService = storageService;
+        _storageOptions = storageOptions;
+    }
 
     public async Task<CaregiverPatientDto?> GetActivePatientAsync(
         Guid caregiverUserId,
@@ -383,7 +395,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 Title: !string.IsNullOrWhiteSpace(s.Type) ? s.Type : "Síntoma",
                 Description: s.Description,
                 EventDate: s.LoggedAt.ToString("o"),
-                Status: null)));
+                Status: null,
+                AttachmentUrl: null,
+                AttachmentFileName: null)));
         }
 
         // Appointments
@@ -416,7 +430,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 Title: title,
                 Description: description,
                 EventDate: a.ScheduledAt.ToString("o"),
-                Status: a.Status.ToString().ToLowerInvariant())));
+                Status: a.Status.ToString().ToLowerInvariant(),
+                AttachmentUrl: null,
+                AttachmentFileName: null)));
         }
 
         // Medication logs — only "taken" entries are meaningful in history
@@ -440,7 +456,9 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 Title: l.MedicationName,
                 Description: l.Notes,
                 EventDate: l.LoggedAt.ToString("o"),
-                Status: null)));
+                Status: null,
+                AttachmentUrl: null,
+                AttachmentFileName: null)));
         }
 
         // ClinicalRecords (manual notes + any other clinical_record rows for this patient)
@@ -449,7 +467,16 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
             .Where(c => c.PatientId == patientId.Value)
             .OrderByDescending(c => c.EventDate)
             .Take(100)
-            .Select(c => new { c.Id, c.EventType, c.Description, c.EventDate })
+            .Select(c => new
+            {
+                c.Id,
+                c.EventType,
+                c.Description,
+                c.EventDate,
+                c.AttachmentPath,
+                c.AttachmentFileName,
+                c.AttachmentContentType
+            })
             .ToListAsync(ct);
 
         foreach (var c in clinicalRows)
@@ -464,13 +491,25 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
                 _ => ("other", "Otro"),
             };
 
+            string? attachmentUrl = null;
+            if (!string.IsNullOrWhiteSpace(c.AttachmentPath))
+            {
+                attachmentUrl = await _storageService.GetSignedUrlAsync(
+                    _storageOptions.AttachmentsBucket,
+                    c.AttachmentPath,
+                    TimeSpan.FromSeconds(_storageOptions.SignedUrlExpirySeconds),
+                    ct);
+            }
+
             rawEvents.Add((c.EventDate, new HistoryEventDto(
                 Id: c.Id,
                 Type: cType,
                 Title: cTitle,
                 Description: c.Description,
                 EventDate: c.EventDate.ToString("o"),
-                Status: null)));
+                Status: null,
+                AttachmentUrl: attachmentUrl,
+                AttachmentFileName: c.AttachmentFileName)));
         }
 
         return rawEvents

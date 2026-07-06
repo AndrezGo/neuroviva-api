@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Common.Abstractions;
+using NeuroViva.Application.Common.Options;
 using NeuroViva.Application.Doctors;
 using NeuroViva.Application.Features.Users.Queries;
 using NeuroViva.Domain.Abstractions;
@@ -21,6 +22,7 @@ using NeuroViva.Infrastructure.Identity;
 using NeuroViva.Infrastructure.Persistence;
 using NeuroViva.Infrastructure.ReadRepositories;
 using NeuroViva.Infrastructure.Repositories;
+using NeuroViva.Infrastructure.Storage;
 
 namespace NeuroViva.Infrastructure;
 
@@ -96,6 +98,27 @@ public static class DependencyInjection
         services.AddScoped<IPatientDoctorRepository, PatientDoctorRepository>();
         services.AddScoped<IAlertRepository, AlertRepository>();
         services.AddScoped<IDoctorReadRepository, DoctorReadRepository>();
+
+        // Storage options
+        services.Configure<SupabaseStorageOptions>(
+            configuration.GetSection(SupabaseStorageOptions.SectionName));
+
+        // Bind StorageOptions and register the plain object so Application handlers can inject it directly
+        // without a Microsoft.Extensions.Options reference in the Application project.
+        var storageOptions = new StorageOptions();
+        configuration.GetSection(StorageOptions.SectionName).Bind(storageOptions);
+        services.AddSingleton(storageOptions);
+
+        // Supabase Storage HTTP client (typed client registered for SupabaseStorageService)
+        var supabaseUrl = configuration["Supabase:Url"]
+            ?? throw new InvalidOperationException("Supabase:Url is not configured.");
+
+        services.AddHttpClient<SupabaseStorageService>(client =>
+        {
+            client.BaseAddress = new Uri(supabaseUrl);
+        });
+
+        services.AddScoped<IStorageService, SupabaseStorageService>();
 
         return services;
     }

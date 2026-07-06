@@ -43,5 +43,20 @@ public sealed class ClinicalRecordConfiguration : IEntityTypeConfiguration<Clini
         builder.Property(c => c.EventDate).HasColumnName("event_at");
         builder.Property(c => c.Metadata).HasColumnName("metadata").HasColumnType("jsonb");
         builder.Property(c => c.CreatedAt).HasColumnName("created_at");
+
+        builder.Property(c => c.AttachmentPath)
+            .HasColumnName("attachment_path")
+            .HasMaxLength(1024)
+            .IsRequired(false);
+
+        builder.Property(c => c.AttachmentFileName)
+            .HasColumnName("attachment_file_name")
+            .HasMaxLength(512)
+            .IsRequired(false);
+
+        builder.Property(c => c.AttachmentContentType)
+            .HasColumnName("attachment_content_type")
+            .HasMaxLength(256)
+            .IsRequired(false);
     }
 }

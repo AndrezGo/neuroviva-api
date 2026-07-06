@@ -335,7 +335,7 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
 
         var rows = await _db.Symptoms
             .AsNoTracking()
-            .Where(s => s.PatientId == patientId.Value)
+            .Where(s => s.PatientId == patientId.Value && !s.IsDeleted)
             .OrderByDescending(s => s.LoggedAt)
             .Take(50)
             .Select(s => new
@@ -369,7 +369,7 @@ public sealed class CaregiverReadRepository : ICaregiverReadRepository
         // Symptoms
         var symptomRows = await _db.Symptoms
             .AsNoTracking()
-            .Where(s => s.PatientId == patientId.Value)
+            .Where(s => s.PatientId == patientId.Value && !s.IsDeleted)
             .OrderByDescending(s => s.LoggedAt)
             .Take(100)
             .Select(s => new { s.Id, s.Type, s.Description, s.LoggedAt })

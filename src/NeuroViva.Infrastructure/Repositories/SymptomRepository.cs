@@ -12,15 +12,17 @@ public sealed class SymptomRepository : ISymptomRepository
     public SymptomRepository(NeuroVivaDbContext db) => _db = db;
 
     public async Task<Symptom?> GetByIdAsync(Guid id, CancellationToken ct = default)
-        => await _db.Symptoms.FirstOrDefaultAsync(s => s.Id == id, ct);
+        => await _db.Symptoms.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted, ct);
 
     public async Task<IReadOnlyList<Symptom>> ListByPatientAsync(Guid patientId, int limit = 50, CancellationToken ct = default)
         => await _db.Symptoms
-            .Where(s => s.PatientId == patientId)
+            .Where(s => s.PatientId == patientId && !s.IsDeleted)
             .OrderByDescending(s => s.LoggedAt)
             .Take(limit)
             .ToListAsync(ct);
 
     public async Task AddAsync(Symptom symptom, CancellationToken ct = default)
         => await _db.Symptoms.AddAsync(symptom, ct);
+
+    public void Update(Symptom symptom) => _db.Symptoms.Update(symptom);
 }

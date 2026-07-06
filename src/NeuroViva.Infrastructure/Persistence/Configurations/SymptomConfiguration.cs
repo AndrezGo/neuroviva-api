@@ -18,6 +18,7 @@ public sealed class SymptomConfiguration : IEntityTypeConfiguration<Symptom>
         builder.Property(s => s.Description).HasColumnName("description");
         builder.Property(s => s.LoggedAt).HasColumnName("logged_at");
         builder.Property(s => s.CreatedAt).HasColumnName("created_at");
+        builder.Property(s => s.IsDeleted).HasColumnName("is_deleted").HasDefaultValue(false);
         builder.Ignore(s => s.DomainEvents);
     }
 }

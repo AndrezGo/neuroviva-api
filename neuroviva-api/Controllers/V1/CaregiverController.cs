@@ -14,6 +14,8 @@ using NeuroViva.Application.Caregivers.Commands.UpdateMedication;
 using NeuroViva.Application.Caregivers.Commands.AssignDoctorToPatient;
 using NeuroViva.Application.Caregivers.Commands.MarkNotificationRead;
 using NeuroViva.Application.Caregivers.Commands.RegisterSymptom;
+using NeuroViva.Application.Caregivers.Commands.UpdateSymptom;
+using NeuroViva.Application.Caregivers.Commands.DeleteSymptom;
 using NeuroViva.Application.Caregivers.Commands.SaveOnboarding;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
 using NeuroViva.Application.Caregivers.Queries.GetPatientDoctor;
@@ -500,6 +502,66 @@ public sealed class CaregiverController : ControllerBase
     }
 
     /// <summary>
+    /// Updates an existing symptom for the caregiver's linked patient.
+    /// The symptom must belong to the authenticated caregiver's linked patient.
+    /// </summary>
+    [HttpPatch("symptoms/{symptomId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateSymptom(
+        Guid symptomId,
+        [FromBody] UpdateSymptomRequest request,
+        CancellationToken ct)
+    {
+        var command = new UpdateSymptomCommand(
+            SymptomId: symptomId,
+            Type: request.Type,
+            Intensity: request.Intensity,
+            Description: request.Description);
+
+        var result = await _mediator.Send(command, ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Soft-deletes a symptom for the caregiver's linked patient.
+    /// Idempotent: succeeds even when the symptom is already deleted.
+    /// </summary>
+    [HttpDelete("symptoms/{symptomId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteSymptom(
+        Guid symptomId,
+        CancellationToken ct)
+    {
+        var result = await _mediator.Send(new DeleteSymptomCommand(symptomId), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.NotFound => NotFound(result.Error.Message),
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                ErrorType.Forbidden => StatusCode(StatusCodes.Status403Forbidden, result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Returns the unified clinical history timeline for the caregiver's linked patient.
     /// Combines symptoms, appointments, medication logs and manual clinical records.
     /// Returns an empty array when no patient is linked.
@@ -677,6 +739,8 @@ public sealed record RegisterSymptomRequest(
     int Intensity,
     string? Description,
     DateTime? LoggedAt);
+
+public sealed record UpdateSymptomRequest(string Type, int Intensity, string? Description);
 
 public sealed record AddClinicalNoteRequest(
     string EventType,

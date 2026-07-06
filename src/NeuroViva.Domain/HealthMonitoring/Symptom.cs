@@ -13,6 +13,7 @@ public sealed class Symptom : AggregateRoot<Guid>
     public string? Description { get; private set; }
     public DateTime LoggedAt { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public bool IsDeleted { get; private set; }
 
     private Symptom() { }
 
@@ -35,7 +36,8 @@ public sealed class Symptom : AggregateRoot<Guid>
             IntensityValue = intensityVo.Value,
             Description = description,
             LoggedAt = loggedAt ?? DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false
         };
 
         if (intensityVo.IsHigh)
@@ -43,5 +45,24 @@ public sealed class Symptom : AggregateRoot<Guid>
                 symptom.Id, patientId, type, intensityVo.Value));
 
         return symptom;
+    }
+
+    public void Update(string type, int intensity, string? description)
+    {
+        var intensityVo = Intensity.Of(intensity);
+
+        Type = type;
+        IntensityValue = intensityVo.Value;
+        Description = description;
+
+        if (intensityVo.IsHigh)
+            RaiseEvent(new HighIntensitySymptomDomainEvent(
+                Id, PatientId, type, intensityVo.Value));
+    }
+
+    public void Delete()
+    {
+        if (IsDeleted) return;
+        IsDeleted = true;
     }
 }

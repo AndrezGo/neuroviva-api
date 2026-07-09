@@ -14,6 +14,8 @@ public sealed class CommunityCommentConfiguration : IEntityTypeConfiguration<Com
         builder.Property(cc => cc.PostId).HasColumnName("post_id");
         builder.Property(cc => cc.AuthorId).HasColumnName("author_id");
         builder.Property(cc => cc.Content).HasColumnName("content");
+        builder.Property(cc => cc.Removed).HasColumnName("removed");
+        builder.Property(cc => cc.RemovedReason).HasColumnName("removed_reason");
         builder.Property(cc => cc.CreatedAt).HasColumnName("created_at");
     }
 }

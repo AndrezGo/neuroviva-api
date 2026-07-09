@@ -16,6 +16,8 @@ public sealed class CommunityPostConfiguration : IEntityTypeConfiguration<Commun
         builder.Property(cp => cp.DiseaseId).HasColumnName("disease_id");
         builder.Property(cp => cp.Content).HasColumnName("content");
         builder.Property(cp => cp.Visibility).HasColumnName("visibility");
+        builder.Property(cp => cp.Removed).HasColumnName("removed");
+        builder.Property(cp => cp.RemovedReason).HasColumnName("removed_reason");
         builder.Property(cp => cp.CreatedAt).HasColumnName("created_at");
         builder.Ignore(cp => cp.DomainEvents);
     }

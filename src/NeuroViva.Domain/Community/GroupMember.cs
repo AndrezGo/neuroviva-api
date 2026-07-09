@@ -18,4 +18,5 @@ public sealed class GroupMember : Entity<Guid>
     };
     public void Leave() => Status = "left";
     public void Mute(DateTime until) { Muted = true; MutedUntil = until; }
+    public void Rejoin() { Status = "active"; }
 }

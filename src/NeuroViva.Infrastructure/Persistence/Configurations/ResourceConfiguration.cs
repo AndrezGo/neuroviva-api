@@ -14,7 +14,7 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.AuthorId).HasColumnName("author_id");
         builder.Property(r => r.DiseaseId).HasColumnName("disease_id");
         builder.Property(r => r.Title).HasColumnName("title");
-        builder.Property(r => r.Type).HasColumnName("type");
+        builder.Property(r => r.Type).HasColumnName("type").HasConversion<string>();
         builder.Property(r => r.Url).HasColumnName("url");
         builder.Property(r => r.Description).HasColumnName("description");
         builder.Property(r => r.ApprovalStatus).HasColumnName("approval_status");

@@ -9,6 +9,8 @@ using NeuroViva.Application.Features.Users.Queries;
 using NeuroViva.Domain.Abstractions;
 using NeuroViva.Domain.Ai.Repositories;
 using NeuroViva.Domain.Billing.Repositories;
+using NeuroViva.Domain.Community.Repositories;
+using NeuroViva.Domain.Content.Repositories;
 using NeuroViva.Domain.Catalog.Repositories;
 using NeuroViva.Domain.Appointments.Repositories;
 using NeuroViva.Domain.HealthMonitoring.Repositories;
@@ -92,6 +94,16 @@ public static class DependencyInjection
 
         // Notification repository
         services.AddScoped<INotificationRepository, NotificationRepository>();
+
+        // Content repositories
+        services.AddScoped<IResourceRepository, ResourceRepository>();
+
+        // Community repositories
+        services.AddScoped<IGroupRepository, GroupRepository>();
+        services.AddScoped<IGroupMemberRepository, GroupMemberRepository>();
+        services.AddScoped<ICommunityPostRepository, CommunityPostRepository>();
+        services.AddScoped<ICommunityCommentRepository, CommunityCommentRepository>();
+        services.AddScoped<ICommunityReactionRepository, CommunityReactionRepository>();
 
         // Doctor repositories
         services.AddScoped<IDoctorRepository, DoctorRepository>();

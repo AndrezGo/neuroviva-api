@@ -21,6 +21,30 @@ public sealed class CommunityCommentRepository : ICommunityCommentRepository
             .OrderBy(c => c.CreatedAt)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<CommunityComment>> ListByPostPagedAsync(
+        Guid postId, int skip, int take, CancellationToken ct = default)
+        => await _db.CommunityComments
+            .AsNoTracking()
+            .Where(c => c.PostId == postId)
+            .OrderBy(c => c.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountByPostsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        CancellationToken ct = default)
+    {
+        var counts = await _db.CommunityComments
+            .AsNoTracking()
+            .Where(c => postIds.Contains(c.PostId))
+            .GroupBy(c => c.PostId)
+            .Select(g => new { PostId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        return counts.ToDictionary(x => x.PostId, x => x.Count);
+    }
+
     public async Task AddAsync(CommunityComment comment, CancellationToken ct = default)
         => await _db.CommunityComments.AddAsync(comment, ct);
 

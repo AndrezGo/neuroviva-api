@@ -7,4 +7,6 @@ public sealed record PostFeedItemDto(
     DateTime CreatedAt,
     bool Removed,
     string? RemovedReason,
-    IReadOnlyDictionary<string, int> Reactions);
+    IReadOnlyDictionary<string, int> Reactions,
+    IReadOnlyList<string> MyReactions,
+    int CommentCount);

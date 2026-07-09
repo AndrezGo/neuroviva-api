@@ -13,19 +13,22 @@ public sealed class GetGroupFeedQueryHandler
     private readonly IGroupMemberRepository _groupMemberRepo;
     private readonly ICommunityPostRepository _postRepo;
     private readonly ICommunityReactionRepository _reactionRepo;
+    private readonly ICommunityCommentRepository _commentRepo;
 
     public GetGroupFeedQueryHandler(
         ICurrentUserService currentUser,
         IGroupRepository groupRepo,
         IGroupMemberRepository groupMemberRepo,
         ICommunityPostRepository postRepo,
-        ICommunityReactionRepository reactionRepo)
+        ICommunityReactionRepository reactionRepo,
+        ICommunityCommentRepository commentRepo)
     {
         _currentUser = currentUser;
         _groupRepo = groupRepo;
         _groupMemberRepo = groupMemberRepo;
         _postRepo = postRepo;
         _reactionRepo = reactionRepo;
+        _commentRepo = commentRepo;
     }
 
     public async Task<Result<IReadOnlyList<PostFeedItemDto>>> Handle(
@@ -57,6 +60,14 @@ public sealed class GetGroupFeedQueryHandler
             ? await _reactionRepo.CountByPostsAsync(postIds, cancellationToken)
             : new Dictionary<Guid, IReadOnlyDictionary<string, int>>();
 
+        var myReactionsByPost = postIds.Count > 0
+            ? await _reactionRepo.ListUserReactionTypesByPostsAsync(postIds, userId, cancellationToken)
+            : new Dictionary<Guid, IReadOnlyList<string>>();
+
+        var commentCountsByPost = postIds.Count > 0
+            ? await _commentRepo.CountByPostsAsync(postIds, cancellationToken)
+            : new Dictionary<Guid, int>();
+
         var dtos = posts.Select(p => new PostFeedItemDto(
             Id: p.Id,
             AuthorId: p.AuthorId,
@@ -66,7 +77,9 @@ public sealed class GetGroupFeedQueryHandler
             RemovedReason: p.RemovedReason,
             Reactions: reactionsByPost.TryGetValue(p.Id, out var r)
                 ? r
-                : new Dictionary<string, int>()
+                : new Dictionary<string, int>(),
+            MyReactions: myReactionsByPost.TryGetValue(p.Id, out var mr) ? mr : Array.Empty<string>(),
+            CommentCount: commentCountsByPost.TryGetValue(p.Id, out var cc) ? cc : 0
         )).ToList();
 
         return Result<IReadOnlyList<PostFeedItemDto>>.Success(dtos);

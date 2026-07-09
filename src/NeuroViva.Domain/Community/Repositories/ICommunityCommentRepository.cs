@@ -4,6 +4,10 @@ public interface ICommunityCommentRepository
 {
     Task<CommunityComment?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<CommunityComment>> ListByPostAsync(Guid postId, CancellationToken ct = default);
+    Task<IReadOnlyList<CommunityComment>> ListByPostPagedAsync(
+        Guid postId, int skip, int take, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<Guid, int>> CountByPostsAsync(
+        IReadOnlyCollection<Guid> postIds, CancellationToken ct = default);
     Task AddAsync(CommunityComment comment, CancellationToken ct = default);
     void Update(CommunityComment comment);
 }

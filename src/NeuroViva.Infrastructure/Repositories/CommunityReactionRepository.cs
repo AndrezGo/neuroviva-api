@@ -46,6 +46,24 @@ public sealed class CommunityReactionRepository : ICommunityReactionRepository
                 g => (IReadOnlyDictionary<string, int>)g.ToDictionary(x => x.Type, x => x.Count));
     }
 
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<string>>> ListUserReactionTypesByPostsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var rows = await _db.CommunityReactions
+            .AsNoTracking()
+            .Where(r => postIds.Contains(r.PostId) && r.UserId == userId)
+            .Select(r => new { r.PostId, r.Type })
+            .ToListAsync(ct);
+
+        return rows
+            .GroupBy(x => x.PostId)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<string>)g.Select(x => x.Type).ToList());
+    }
+
     public async Task AddAsync(CommunityReaction reaction, CancellationToken ct = default)
         => await _db.CommunityReactions.AddAsync(reaction, ct);
 

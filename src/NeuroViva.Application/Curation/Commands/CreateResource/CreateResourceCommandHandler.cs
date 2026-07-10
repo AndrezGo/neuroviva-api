@@ -38,11 +38,15 @@ public sealed class CreateResourceCommandHandler
 
         if (request.Type == ResourceType.Video)
         {
-            if (string.IsNullOrWhiteSpace(request.Url) ||
-                YouTubeUrlParser.TryGetEmbedUrl(request.Url) is null)
+            if (string.IsNullOrWhiteSpace(request.Url))
+                return Error.Validation(
+                    "resource.video_url_required",
+                    "A YouTube URL is required for video resources.");
+
+            if (YouTubeUrlParser.TryGetEmbedUrl(request.Url) is null)
                 return Error.Validation(
                     "resource.invalid_video_url",
-                    "Only YouTube URLs are supported for now.");
+                    "The provided URL is not a valid YouTube video URL. Supported formats: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/..., youtube.com/shorts/...");
         }
 
         var resource = Resource.Create(

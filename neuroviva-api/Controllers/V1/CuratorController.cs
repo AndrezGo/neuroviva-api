@@ -10,6 +10,7 @@ using NeuroViva.Application.Community.Commands.ModeratePost;
 using NeuroViva.Application.Curation.Commands.ApproveResource;
 using NeuroViva.Application.Curation.Commands.CreateResource;
 using NeuroViva.Application.Curation.Commands.RejectResource;
+using NeuroViva.Application.Curation.Queries.GetActiveDiseases;
 using NeuroViva.Application.Curation.Queries.GetPendingResources;
 using NeuroViva.Domain.Content.Enums;
 
@@ -70,6 +71,26 @@ public sealed class CuratorController : ControllerBase
     public async Task<IActionResult> GetPendingResources(CancellationToken ct)
     {
         var result = await _mediator.Send(new GetPendingResourcesQuery(), ct);
+
+        if (result.IsFailure)
+            return result.Error.Type switch
+            {
+                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
+                _ => BadRequest(result.Error.Message)
+            };
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Returns all active diseases for catalog/selector use (create resource, create group).
+    /// </summary>
+    [HttpGet("diseases")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetActiveDiseases(CancellationToken ct)
+    {
+        var result = await _mediator.Send(new GetActiveDiseasesQuery(), ct);
 
         if (result.IsFailure)
             return result.Error.Type switch

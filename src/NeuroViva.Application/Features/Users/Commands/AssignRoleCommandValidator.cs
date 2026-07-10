@@ -4,7 +4,7 @@ namespace NeuroViva.Application.Features.Users.Commands;
 
 public sealed class AssignRoleCommandValidator : AbstractValidator<AssignRoleCommand>
 {
-    private static readonly string[] ValidRoles = ["paciente", "cuidador", "medico", "comite_cientifico", "admin"];
+    private static readonly string[] ValidRoles = ["paciente", "cuidador", "medico"];
 
     public AssignRoleCommandValidator()
     {

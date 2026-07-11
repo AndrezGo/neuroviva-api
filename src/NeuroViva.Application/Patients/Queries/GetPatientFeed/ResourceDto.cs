@@ -9,4 +9,6 @@ public sealed record ResourceDto(
     DateTime CreatedAt,
     string? EmbedUrl,
     Guid? ChannelId,
-    string? ChannelName);
+    string? ChannelName,
+    string? SourceName = null,
+    DateTime? PublishedAt = null);

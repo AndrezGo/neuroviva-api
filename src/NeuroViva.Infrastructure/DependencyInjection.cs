@@ -19,6 +19,7 @@ using NeuroViva.Domain.Patients.Repositories;
 using NeuroViva.Domain.Tenancy.Repositories;
 using NeuroViva.Domain.Users.Repositories;
 using NeuroViva.Infrastructure.DomainEvents;
+using NeuroViva.Infrastructure.ExternalServices;
 using NeuroViva.Infrastructure.ExternalServices.Clock;
 using NeuroViva.Infrastructure.Identity;
 using NeuroViva.Infrastructure.Persistence;
@@ -98,6 +99,7 @@ public static class DependencyInjection
         // Content repositories
         services.AddScoped<IResourceRepository, ResourceRepository>();
         services.AddScoped<IChannelRepository, ChannelRepository>();
+        services.AddScoped<INewsArticleRepository, NewsArticleRepository>();
 
         // Community repositories
         services.AddScoped<IGroupRepository, GroupRepository>();
@@ -132,6 +134,14 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IStorageService, SupabaseStorageService>();
+
+        // Google News RSS typed client (external service, no auth)
+        services.AddHttpClient<GoogleNewsRssService>(client =>
+        {
+            client.BaseAddress = new Uri("https://news.google.com/");
+            client.Timeout = TimeSpan.FromSeconds(10);
+        });
+        services.AddScoped<IGoogleNewsRssService, GoogleNewsRssService>();
 
         return services;
     }

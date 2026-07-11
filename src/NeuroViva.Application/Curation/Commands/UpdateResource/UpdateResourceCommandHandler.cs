@@ -1,37 +1,33 @@
 using MediatR;
-using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Common.Models;
 using NeuroViva.Application.Patients.Queries.GetPatientFeed;
 using NeuroViva.Domain.Abstractions;
-using NeuroViva.Domain.Content;
 using NeuroViva.Domain.Content.Enums;
 using NeuroViva.Domain.Content.Repositories;
 
-namespace NeuroViva.Application.Curation.Commands.CreateResource;
+namespace NeuroViva.Application.Curation.Commands.UpdateResource;
 
-public sealed class CreateResourceCommandHandler
-    : IRequestHandler<CreateResourceCommand, Result<CreateResourceResult>>
+public sealed class UpdateResourceCommandHandler
+    : IRequestHandler<UpdateResourceCommand, Result>
 {
-    private readonly ICurrentUserService _currentUser;
     private readonly IResourceRepository _resourceRepo;
     private readonly IUnitOfWork _uow;
 
-    public CreateResourceCommandHandler(
-        ICurrentUserService currentUser,
+    public UpdateResourceCommandHandler(
         IResourceRepository resourceRepo,
         IUnitOfWork uow)
     {
-        _currentUser = currentUser;
         _resourceRepo = resourceRepo;
         _uow = uow;
     }
 
-    public async Task<Result<CreateResourceResult>> Handle(
-        CreateResourceCommand request,
+    public async Task<Result> Handle(
+        UpdateResourceCommand request,
         CancellationToken cancellationToken)
     {
-        if (_currentUser.UserId is null)
-            return Error.Unauthorized("User not synced. Call /users/sync first.");
+        var resource = await _resourceRepo.GetByIdAsync(request.Id, cancellationToken);
+        if (resource is null)
+            return Error.NotFound("resource.not_found", "Resource not found");
 
         if (string.IsNullOrWhiteSpace(request.Title))
             return Error.Validation("resource.title_required", "Title is required.");
@@ -52,18 +48,10 @@ public sealed class CreateResourceCommandHandler
                     "The provided URL is not a valid YouTube video URL. Supported formats: youtube.com/watch?v=..., youtu.be/..., youtube.com/embed/..., youtube.com/shorts/...");
         }
 
-        var resource = Resource.Create(
-            authorId: _currentUser.UserId.Value,
-            title: request.Title.Trim(),
-            type: request.Type,
-            diseaseId: request.DiseaseId,
-            url: request.Url,
-            description: request.Description,
-            channelId: request.ChannelId);
-
-        await _resourceRepo.AddAsync(resource, cancellationToken);
+        resource.Update(request.Title.Trim(), request.Type, request.Url, request.Description, request.DiseaseId, request.ChannelId);
+        _resourceRepo.Update(resource);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        return new CreateResourceResult(resource.Id);
+        return Result.Ok;
     }
 }

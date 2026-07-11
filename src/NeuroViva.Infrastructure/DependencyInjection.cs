@@ -97,6 +97,7 @@ public static class DependencyInjection
 
         // Content repositories
         services.AddScoped<IResourceRepository, ResourceRepository>();
+        services.AddScoped<IChannelRepository, ChannelRepository>();
 
         // Community repositories
         services.AddScoped<IGroupRepository, GroupRepository>();

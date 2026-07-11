@@ -7,4 +7,6 @@ public sealed record ResourceDto(
     string? Url,
     string? Description,
     DateTime CreatedAt,
-    string? EmbedUrl);
+    string? EmbedUrl,
+    Guid? ChannelId,
+    string? ChannelName);

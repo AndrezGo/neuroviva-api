@@ -32,6 +32,12 @@ public sealed class ResourceRepository : IResourceRepository
             .Where(r => r.ApprovalStatus == "pendiente")
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Resource>> ListAllAsync(CancellationToken ct = default)
+        => await _db.Resources
+            .AsNoTracking()
+            .OrderByDescending(r => r.CreatedAt)
+            .ToListAsync(ct);
+
     public async Task AddAsync(Resource resource, CancellationToken ct = default)
         => await _db.Resources.AddAsync(resource, ct);
 

@@ -9,6 +9,7 @@ public sealed record CreateResourceCommand(
     ResourceType Type,
     string? Url,
     string? Description,
-    Guid? DiseaseId) : IRequest<Result<CreateResourceResult>>;
+    Guid? DiseaseId,
+    Guid? ChannelId) : IRequest<Result<CreateResourceResult>>;
 
 public sealed record CreateResourceResult(Guid ResourceId);

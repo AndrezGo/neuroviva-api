@@ -2,15 +2,15 @@ using MediatR;
 using NeuroViva.Application.Common.Models;
 using NeuroViva.Domain.Content.Repositories;
 
-namespace NeuroViva.Application.Curation.Queries.GetPendingResources;
+namespace NeuroViva.Application.Curation.Queries.GetAllResources;
 
-public sealed class GetPendingResourcesQueryHandler
-    : IRequestHandler<GetPendingResourcesQuery, Result<IReadOnlyList<PendingResourceDto>>>
+public sealed class GetAllResourcesQueryHandler
+    : IRequestHandler<GetAllResourcesQuery, Result<IReadOnlyList<ResourceListItemDto>>>
 {
     private readonly IResourceRepository _resourceRepo;
     private readonly IChannelRepository _channelRepo;
 
-    public GetPendingResourcesQueryHandler(
+    public GetAllResourcesQueryHandler(
         IResourceRepository resourceRepo,
         IChannelRepository channelRepo)
     {
@@ -18,11 +18,11 @@ public sealed class GetPendingResourcesQueryHandler
         _channelRepo = channelRepo;
     }
 
-    public async Task<Result<IReadOnlyList<PendingResourceDto>>> Handle(
-        GetPendingResourcesQuery request,
+    public async Task<Result<IReadOnlyList<ResourceListItemDto>>> Handle(
+        GetAllResourcesQuery request,
         CancellationToken cancellationToken)
     {
-        var resources = await _resourceRepo.ListPendingAsync(cancellationToken);
+        var resources = await _resourceRepo.ListAllAsync(cancellationToken);
 
         var channelIds = resources
             .Where(r => r.ChannelId.HasValue)
@@ -35,7 +35,7 @@ public sealed class GetPendingResourcesQueryHandler
             : (await _channelRepo.ListByIdsAsync(channelIds, cancellationToken))
                 .ToDictionary(c => c.Id, c => c.Name);
 
-        var dtos = resources.Select(r => new PendingResourceDto(
+        var dtos = resources.Select(r => new ResourceListItemDto(
             Id: r.Id,
             AuthorId: r.AuthorId,
             DiseaseId: r.DiseaseId,
@@ -45,9 +45,10 @@ public sealed class GetPendingResourcesQueryHandler
             Description: r.Description,
             CreatedAt: r.CreatedAt,
             ChannelId: r.ChannelId,
-            ChannelName: r.ChannelId.HasValue && channelNameById.TryGetValue(r.ChannelId.Value, out var cname) ? cname : null
+            ChannelName: r.ChannelId.HasValue && channelNameById.TryGetValue(r.ChannelId.Value, out var cname) ? cname : null,
+            ApprovalStatus: r.ApprovalStatus
         )).ToList();
 
-        return Result<IReadOnlyList<PendingResourceDto>>.Success(dtos);
+        return Result<IReadOnlyList<ResourceListItemDto>>.Success(dtos);
     }
 }

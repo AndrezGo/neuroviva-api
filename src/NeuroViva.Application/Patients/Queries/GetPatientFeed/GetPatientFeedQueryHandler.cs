@@ -14,17 +14,20 @@ public sealed class GetPatientFeedQueryHandler
     private readonly IPatientRepository _patientRepo;
     private readonly IPatientDiseaseRepository _patientDiseaseRepo;
     private readonly IResourceRepository _resourceRepo;
+    private readonly IChannelRepository _channelRepo;
 
     public GetPatientFeedQueryHandler(
         ICurrentUserService currentUser,
         IPatientRepository patientRepo,
         IPatientDiseaseRepository patientDiseaseRepo,
-        IResourceRepository resourceRepo)
+        IResourceRepository resourceRepo,
+        IChannelRepository channelRepo)
     {
         _currentUser = currentUser;
         _patientRepo = patientRepo;
         _patientDiseaseRepo = patientDiseaseRepo;
         _resourceRepo = resourceRepo;
+        _channelRepo = channelRepo;
     }
 
     public async Task<Result<IReadOnlyList<ResourceDto>>> Handle(
@@ -43,6 +46,17 @@ public sealed class GetPatientFeedQueryHandler
 
         var resources = await _resourceRepo.ListApprovedAsync(request.Type, diseaseIds, cancellationToken);
 
+        var channelIds = resources
+            .Where(r => r.ChannelId.HasValue)
+            .Select(r => r.ChannelId!.Value)
+            .Distinct()
+            .ToList();
+
+        var channelNameById = channelIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : (await _channelRepo.ListByIdsAsync(channelIds, cancellationToken))
+                .ToDictionary(c => c.Id, c => c.Name);
+
         var dtos = resources.Select(r => new ResourceDto(
             Id: r.Id,
             Title: r.Title,
@@ -52,7 +66,9 @@ public sealed class GetPatientFeedQueryHandler
             CreatedAt: r.CreatedAt,
             EmbedUrl: r.Type == ResourceType.Video
                 ? YouTubeUrlParser.TryGetEmbedUrl(r.Url)
-                : null
+                : null,
+            ChannelId: r.ChannelId,
+            ChannelName: r.ChannelId.HasValue && channelNameById.TryGetValue(r.ChannelId.Value, out var cname) ? cname : null
         )).ToList();
 
         return Result<IReadOnlyList<ResourceDto>>.Success(dtos);

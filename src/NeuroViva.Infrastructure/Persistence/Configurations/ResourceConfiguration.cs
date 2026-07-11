@@ -31,6 +31,7 @@ public sealed class ResourceConfiguration : IEntityTypeConfiguration<Resource>
         builder.Property(r => r.Id).HasColumnName("id");
         builder.Property(r => r.AuthorId).HasColumnName("author_id");
         builder.Property(r => r.DiseaseId).HasColumnName("disease_id");
+        builder.Property(r => r.ChannelId).HasColumnName("channel_id");
         builder.Property(r => r.Title).HasColumnName("title");
         builder.Property(r => r.Type).HasColumnName("type")
             .HasConversion(v => TypeToDb(v), v => TypeFromDb(v));

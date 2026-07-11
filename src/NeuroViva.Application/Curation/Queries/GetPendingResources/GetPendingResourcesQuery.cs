@@ -13,4 +13,6 @@ public sealed record PendingResourceDto(
     string Type,
     string? Url,
     string? Description,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    Guid? ChannelId,
+    string? ChannelName);

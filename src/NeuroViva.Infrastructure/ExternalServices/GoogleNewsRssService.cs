@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using System.Globalization;
+using System.Net.Http;
+using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using NeuroViva.Application.Common.Abstractions;
@@ -18,18 +21,42 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
 
     public async Task<IReadOnlyList<RawNewsItem>> SearchAsync(string query, CancellationToken ct = default)
     {
+        var stopwatch = Stopwatch.StartNew();
+        var relativeUrl = $"rss/search?q={Uri.EscapeDataString(query)}&hl=es-419&gl=CO&ceid=CO:es-419";
+        var absoluteUrl = new Uri(_http.BaseAddress!, relativeUrl);
+
+        _logger.LogInformation(
+            "Google News RSS request starting. AbsoluteUrl='{AbsoluteUrl}', Query='{Query}'.",
+            absoluteUrl,
+            query);
+
         try
         {
-            var relativeUrl = $"rss/search?q={Uri.EscapeDataString(query)}&hl=es-419&gl=CO&ceid=CO:es-419";
-
             var response = await _http.GetAsync(relativeUrl, ct);
+
+            var statusCode = (int)response.StatusCode;
+            long? contentLength = response.Content.Headers.ContentLength;
 
             if (!response.IsSuccessStatusCode)
             {
+                string bodyPreview;
+                try
+                {
+                    var body = await response.Content.ReadAsStringAsync(ct);
+                    bodyPreview = body.Substring(0, Math.Min(500, body.Length));
+                }
+                catch
+                {
+                    bodyPreview = "could not read body preview";
+                }
+
                 _logger.LogWarning(
-                    "Google News RSS returned non-success status {StatusCode} for query '{Query}'.",
-                    (int)response.StatusCode,
-                    query);
+                    "Google News RSS returned non-success status {StatusCode} after {ElapsedMs} ms. ContentLength={ContentLength}, Query='{Query}', BodyPreview='{BodyPreview}'.",
+                    statusCode,
+                    stopwatch.ElapsedMilliseconds,
+                    contentLength,
+                    query,
+                    bodyPreview);
                 return Array.Empty<RawNewsItem>();
             }
 
@@ -38,12 +65,23 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
 
             var channel = doc.Root?.Element("channel");
             if (channel is null)
+            {
+                _logger.LogWarning(
+                    "Google News RSS response had no <channel> element. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}'.",
+                    statusCode,
+                    contentLength,
+                    stopwatch.ElapsedMilliseconds,
+                    query);
                 return Array.Empty<RawNewsItem>();
+            }
 
             var results = new List<RawNewsItem>();
+            var itemNodeCount = 0;
 
             foreach (var item in channel.Elements("item"))
             {
+                itemNodeCount++;
+
                 var title = item.Element("title")?.Value;
                 if (string.IsNullOrWhiteSpace(title))
                     continue;
@@ -77,13 +115,59 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
                 results.Add(new RawNewsItem(title, link, publishedAt, description, sourceName, guid));
             }
 
+            _logger.LogInformation(
+                "Google News RSS request succeeded. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}', ItemNodes={ItemNodes}, Results={Results}.",
+                statusCode,
+                contentLength,
+                stopwatch.ElapsedMilliseconds,
+                query,
+                itemNodeCount,
+                results.Count);
+
             return results;
         }
-        catch (Exception ex)
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning(
                 ex,
-                "Failed to fetch or parse Google News RSS for query '{Query}'.",
+                "Google News RSS request timed out after {ElapsedMs} ms for query '{Query}'.",
+                stopwatch.ElapsedMilliseconds,
+                query);
+            return Array.Empty<RawNewsItem>();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation(
+                "Google News RSS request canceled by caller after {ElapsedMs} ms for query '{Query}'.",
+                stopwatch.ElapsedMilliseconds,
+                query);
+            return Array.Empty<RawNewsItem>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Google News RSS HTTP request failed after {ElapsedMs} ms for query '{Query}'. InnerStatus={InnerStatus}.",
+                stopwatch.ElapsedMilliseconds,
+                query,
+                ex.StatusCode);
+            return Array.Empty<RawNewsItem>();
+        }
+        catch (XmlException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Google News RSS returned malformed XML after {ElapsedMs} ms for query '{Query}'.",
+                stopwatch.ElapsedMilliseconds,
+                query);
+            return Array.Empty<RawNewsItem>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Google News RSS unexpected failure after {ElapsedMs} ms for query '{Query}'.",
+                stopwatch.ElapsedMilliseconds,
                 query);
             return Array.Empty<RawNewsItem>();
         }

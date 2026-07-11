@@ -56,6 +56,21 @@ public sealed class PatientRepository : IPatientRepository
             .FirstOrDefaultAsync(p => p.UserId == userId, ct);
     }
 
+    public async Task<Patient?> FindClaimableByDocumentNumberAsync(
+        string documentNumber,
+        Guid preferredUserId,
+        CancellationToken ct = default)
+    {
+        var normalized = documentNumber.Trim().ToUpperInvariant();
+
+        return await _db.Patients
+            .IgnoreQueryFilters()
+            .Where(p => p.DocumentNumber == normalized)
+            .OrderBy(p => p.UserId == preferredUserId ? 0 : (p.UserId == null ? 1 : 2))
+            .ThenBy(p => p.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task AddAsync(Patient patient, CancellationToken ct = default)
         => await _db.Patients.AddAsync(patient, ct);
 

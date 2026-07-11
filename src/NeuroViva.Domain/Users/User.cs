@@ -1,4 +1,5 @@
 using NeuroViva.Domain.Common;
+using NeuroViva.Domain.Exceptions;
 
 namespace NeuroViva.Domain.Users;
 
@@ -35,4 +36,22 @@ public sealed class User : AggregateRoot<Guid>, ITenantOwned
     public void Activate() => IsActive = true;
     public void UpdateAvatar(string url) => AvatarUrl = url;
     public void UpdateName(string name) => Name = name;
+
+    /// <summary>
+    /// Moves this user to a different tenant. Used by the ClaimPatientProfile flow
+    /// when a patient adopts a profile previously created by a caregiver in another tenant.
+    /// Idempotent when the user is already in the target tenant.
+    /// </summary>
+    public void MoveToTenant(Guid newTenantId)
+    {
+        if (newTenantId == Guid.Empty)
+            throw new BusinessRuleViolationException(
+                "user.invalid_tenant",
+                "Tenant id cannot be empty.");
+
+        if (TenantId == newTenantId)
+            return;
+
+        TenantId = newTenantId;
+    }
 }

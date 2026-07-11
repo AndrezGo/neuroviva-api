@@ -42,12 +42,12 @@ public sealed class ClaimPatientProfileCommandHandler
         var currentUserId = _currentUser.UserId.Value;
         var tenantId = _currentUser.TenantId.Value;
 
-        var patient = await _patientRepo.GetByDocumentNumberAsync(
-            tenantId, request.DocumentNumber, cancellationToken);
+        var patient = await _patientRepo.FindClaimableByDocumentNumberAsync(
+            request.DocumentNumber, currentUserId, cancellationToken);
 
         if (patient is null)
         {
-            // Patient does not exist yet — create it using the current user's name.
+            // Patient does not exist yet in any tenant — create it using the current user's name.
             var user = await _userRepo.GetByIdAsync(currentUserId, cancellationToken);
             var patientName = user?.Name ?? "Paciente";
 
@@ -71,6 +71,19 @@ public sealed class ClaimPatientProfileCommandHandler
             }
 
             _patientRepo.Update(patient);
+
+            // If the patient lives in a different tenant (created by a caregiver), move the
+            // current user into that tenant so subsequent requests resolve the correct care circle.
+            if (patient.TenantId != tenantId)
+            {
+                var user = await _userRepo.GetByIdAsync(currentUserId, cancellationToken);
+
+                if (user is null)
+                    return Error.NotFound("user.not_found", "Current user not found.");
+
+                user.MoveToTenant(patient.TenantId);
+                _userRepo.Update(user);
+            }
         }
 
         await _uow.SaveChangesAsync(cancellationToken);

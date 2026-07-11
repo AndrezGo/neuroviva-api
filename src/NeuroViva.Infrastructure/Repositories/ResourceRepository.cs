@@ -22,14 +22,14 @@ public sealed class ResourceRepository : IResourceRepository
         => await _db.Resources
             .AsNoTracking()
             .Where(r => r.Type == type
-                && r.ApprovalStatus == "approved"
+                && r.ApprovalStatus == "aprobado"
                 && (r.DiseaseId == null || diseaseIds.Contains(r.DiseaseId.Value)))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Resource>> ListPendingAsync(CancellationToken ct = default)
         => await _db.Resources
             .AsNoTracking()
-            .Where(r => r.ApprovalStatus == "pending")
+            .Where(r => r.ApprovalStatus == "pendiente")
             .ToListAsync(ct);
 
     public async Task AddAsync(Resource resource, CancellationToken ct = default)

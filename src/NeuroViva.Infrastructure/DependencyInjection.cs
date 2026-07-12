@@ -128,20 +128,17 @@ public static class DependencyInjection
         var supabaseUrl = configuration["Supabase:Url"]
             ?? throw new InvalidOperationException("Supabase:Url is not configured.");
 
-        services.AddHttpClient<SupabaseStorageService>(client =>
+        services.AddHttpClient<IStorageService, SupabaseStorageService>(client =>
         {
             client.BaseAddress = new Uri(supabaseUrl);
         });
 
-        services.AddScoped<IStorageService, SupabaseStorageService>();
-
         // Google News RSS typed client (external service, no auth)
-        services.AddHttpClient<GoogleNewsRssService>(client =>
+        services.AddHttpClient<IGoogleNewsRssService, GoogleNewsRssService>(client =>
         {
             client.BaseAddress = new Uri("https://news.google.com/");
             client.Timeout = TimeSpan.FromSeconds(10);
         });
-        services.AddScoped<IGoogleNewsRssService, GoogleNewsRssService>();
 
         return services;
     }

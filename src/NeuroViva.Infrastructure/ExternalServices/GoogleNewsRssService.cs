@@ -23,11 +23,10 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
     {
         var stopwatch = Stopwatch.StartNew();
         var relativeUrl = $"rss/search?q={Uri.EscapeDataString(query)}&hl=es-419&gl=CO&ceid=CO:es-419";
-        var absoluteUrl = new Uri(_http.BaseAddress!, relativeUrl);
-
         _logger.LogInformation(
-            "Google News RSS request starting. AbsoluteUrl='{AbsoluteUrl}', Query='{Query}'.",
-            absoluteUrl,
+            "Google News RSS request starting. BaseAddress='{BaseAddress}', RelativeUrl='{RelativeUrl}', Query='{Query}'.",
+            _http.BaseAddress?.ToString() ?? "(null)",
+            relativeUrl,
             query);
 
         try

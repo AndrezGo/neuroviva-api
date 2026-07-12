@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
@@ -105,7 +107,7 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
                     publishedAt = DateTime.UtcNow;
                 }
 
-                var description = item.Element("description")?.Value;
+                var description = StripHtml(item.Element("description")?.Value);
                 var sourceName = item.Element("source")?.Value;
                 var guid = item.Element("guid")?.Value;
                 if (string.IsNullOrWhiteSpace(guid))
@@ -170,5 +172,15 @@ public sealed class GoogleNewsRssService : IGoogleNewsRssService
                 query);
             return Array.Empty<RawNewsItem>();
         }
+    }
+
+    private static string? StripHtml(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return value;
+
+        var stripped = Regex.Replace(value, "<[^>]+>", string.Empty);
+        var decoded = WebUtility.HtmlDecode(stripped).Trim();
+        return decoded.Length == 0 ? null : decoded;
     }
 }

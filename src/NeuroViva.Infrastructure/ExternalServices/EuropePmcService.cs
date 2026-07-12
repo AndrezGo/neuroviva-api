@@ -19,15 +19,25 @@ public sealed class EuropePmcService : IEuropePmcService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<RawScientificArticle>> SearchAsync(string query, CancellationToken ct = default)
+    private static string MapLanguageCode(string language) => language switch
     {
+        "es" => "spa",
+        "en" => "eng",
+        _ => throw new ArgumentException($"Unsupported language code '{language}'. Allowed: es, en.", nameof(language))
+    };
+
+    public async Task<IReadOnlyList<RawScientificArticle>> SearchAsync(string query, string language, CancellationToken ct = default)
+    {
+        var pmcCode = MapLanguageCode(language);
+        var fullQuery = $"{query} AND LANG:{pmcCode}";
         var stopwatch = Stopwatch.StartNew();
-        var relativeUrl = $"search?query={Uri.EscapeDataString(query)}&format=json&pageSize=20&resultType=core";
+        var relativeUrl = $"search?query={Uri.EscapeDataString(fullQuery)}&format=json&pageSize=20&resultType=core";
         _logger.LogInformation(
-            "Europe PMC request starting. BaseAddress='{BaseAddress}', RelativeUrl='{RelativeUrl}', Query='{Query}'.",
+            "Europe PMC request starting. BaseAddress='{BaseAddress}', RelativeUrl='{RelativeUrl}', Query='{Query}', Language='{Language}'.",
             _http.BaseAddress?.ToString() ?? "(null)",
             relativeUrl,
-            query);
+            fullQuery,
+            language);
 
         try
         {
@@ -50,11 +60,12 @@ public sealed class EuropePmcService : IEuropePmcService
                 }
 
                 _logger.LogWarning(
-                    "Europe PMC returned non-success status {StatusCode} after {ElapsedMs} ms. ContentLength={ContentLength}, Query='{Query}', BodyPreview='{BodyPreview}'.",
+                    "Europe PMC returned non-success status {StatusCode} after {ElapsedMs} ms. ContentLength={ContentLength}, Query='{Query}', Language='{Language}', BodyPreview='{BodyPreview}'.",
                     statusCode,
                     stopwatch.ElapsedMilliseconds,
                     contentLength,
-                    query,
+                    fullQuery,
+                    language,
                     bodyPreview);
                 return Array.Empty<RawScientificArticle>();
             }
@@ -69,11 +80,12 @@ public sealed class EuropePmcService : IEuropePmcService
                 || resultArray.ValueKind != JsonValueKind.Array)
             {
                 _logger.LogWarning(
-                    "Europe PMC response missing resultList.result array. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}'.",
+                    "Europe PMC response missing resultList.result array. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}', Language='{Language}'.",
                     statusCode,
                     contentLength,
                     stopwatch.ElapsedMilliseconds,
-                    query);
+                    fullQuery,
+                    language);
                 return Array.Empty<RawScientificArticle>();
             }
 
@@ -162,11 +174,12 @@ public sealed class EuropePmcService : IEuropePmcService
             }
 
             _logger.LogInformation(
-                "Europe PMC request succeeded. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}', ItemNodes={ItemNodes}, Results={Results}.",
+                "Europe PMC request succeeded. StatusCode={StatusCode}, ContentLength={ContentLength}, ElapsedMs={ElapsedMs}, Query='{Query}', Language='{Language}', ItemNodes={ItemNodes}, Results={Results}.",
                 statusCode,
                 contentLength,
                 stopwatch.ElapsedMilliseconds,
-                query,
+                fullQuery,
+                language,
                 itemNodeCount,
                 results.Count);
 
@@ -176,26 +189,29 @@ public sealed class EuropePmcService : IEuropePmcService
         {
             _logger.LogWarning(
                 ex,
-                "Europe PMC request timed out after {ElapsedMs} ms for query '{Query}'.",
+                "Europe PMC request timed out after {ElapsedMs} ms for query '{Query}', Language='{Language}'.",
                 stopwatch.ElapsedMilliseconds,
-                query);
+                fullQuery,
+                language);
             return Array.Empty<RawScientificArticle>();
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation(
-                "Europe PMC request canceled by caller after {ElapsedMs} ms for query '{Query}'.",
+                "Europe PMC request canceled by caller after {ElapsedMs} ms for query '{Query}', Language='{Language}'.",
                 stopwatch.ElapsedMilliseconds,
-                query);
+                fullQuery,
+                language);
             return Array.Empty<RawScientificArticle>();
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(
                 ex,
-                "Europe PMC HTTP request failed after {ElapsedMs} ms for query '{Query}'. InnerStatus={InnerStatus}.",
+                "Europe PMC HTTP request failed after {ElapsedMs} ms for query '{Query}', Language='{Language}'. InnerStatus={InnerStatus}.",
                 stopwatch.ElapsedMilliseconds,
-                query,
+                fullQuery,
+                language,
                 ex.StatusCode);
             return Array.Empty<RawScientificArticle>();
         }
@@ -203,18 +219,20 @@ public sealed class EuropePmcService : IEuropePmcService
         {
             _logger.LogWarning(
                 ex,
-                "Europe PMC returned malformed JSON after {ElapsedMs} ms for query '{Query}'.",
+                "Europe PMC returned malformed JSON after {ElapsedMs} ms for query '{Query}', Language='{Language}'.",
                 stopwatch.ElapsedMilliseconds,
-                query);
+                fullQuery,
+                language);
             return Array.Empty<RawScientificArticle>();
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                "Europe PMC unexpected failure after {ElapsedMs} ms for query '{Query}'.",
+                "Europe PMC unexpected failure after {ElapsedMs} ms for query '{Query}', Language='{Language}'.",
                 stopwatch.ElapsedMilliseconds,
-                query);
+                fullQuery,
+                language);
             return Array.Empty<RawScientificArticle>();
         }
     }

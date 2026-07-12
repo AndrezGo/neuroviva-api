@@ -13,6 +13,7 @@ public sealed class ScientificArticleRecord : Entity<Guid>
     public DateTime PublishedAt { get; private set; }
     public DateTime FetchedAt { get; private set; }
     public string ExternalGuid { get; private set; } = default!;
+    public string Language { get; private set; } = default!;
 
     private ScientificArticleRecord() { }
 
@@ -24,17 +25,25 @@ public sealed class ScientificArticleRecord : Entity<Guid>
         string? description,
         string? authors,
         DateTime publishedAt,
-        string externalGuid) => new()
+        string externalGuid,
+        string language)
     {
-        Id = Guid.NewGuid(),
-        DiseaseId = diseaseId,
-        Title = title,
-        SourceUrl = sourceUrl,
-        SourceName = sourceName,
-        Description = description,
-        Authors = authors,
-        PublishedAt = publishedAt,
-        FetchedAt = DateTime.UtcNow,
-        ExternalGuid = externalGuid,
-    };
+        if (string.IsNullOrWhiteSpace(language))
+            throw new ArgumentException("Language cannot be null or whitespace.", nameof(language));
+
+        return new ScientificArticleRecord
+        {
+            Id = Guid.NewGuid(),
+            DiseaseId = diseaseId,
+            Title = title,
+            SourceUrl = sourceUrl,
+            SourceName = sourceName,
+            Description = description,
+            Authors = authors,
+            PublishedAt = publishedAt,
+            FetchedAt = DateTime.UtcNow,
+            ExternalGuid = externalGuid,
+            Language = language,
+        };
+    }
 }

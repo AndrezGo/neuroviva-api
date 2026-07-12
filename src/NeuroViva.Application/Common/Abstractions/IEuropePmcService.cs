@@ -11,5 +11,5 @@ public sealed record RawScientificArticle(
 
 public interface IEuropePmcService
 {
-    Task<IReadOnlyList<RawScientificArticle>> SearchAsync(string query, CancellationToken ct = default);
+    Task<IReadOnlyList<RawScientificArticle>> SearchAsync(string query, string language, CancellationToken ct = default);
 }

@@ -154,10 +154,10 @@ public sealed class GetPatientFeedQueryHandler
                 if (disease is null) continue;
                 if (!DiseaseSearchTerms.TryGetSearchTerm(disease.Slug, out var searchTerm)) continue;
 
-                var lastFetched = await _scientificArticleRepo.GetLastFetchedAtAsync(diseaseId, cancellationToken);
+                var lastFetched = await _scientificArticleRepo.GetLastFetchedAtAsync(diseaseId, request.Language, cancellationToken);
                 if (lastFetched is null || lastFetched < DateTime.UtcNow.AddHours(-6))
                 {
-                    var rawItems = await _europePmc.SearchAsync(searchTerm, cancellationToken);
+                    var rawItems = await _europePmc.SearchAsync(searchTerm, request.Language, cancellationToken);
                     if (rawItems.Count > 0)
                     {
                         var toUpsert = rawItems
@@ -169,7 +169,8 @@ public sealed class GetPatientFeedQueryHandler
                                 x.Description,
                                 x.Authors,
                                 x.PublishedAt,
-                                x.ExternalGuid))
+                                x.ExternalGuid,
+                                request.Language))
                             .ToList();
                         await _scientificArticleRepo.UpsertManyAsync(toUpsert, cancellationToken);
                     }
@@ -177,7 +178,7 @@ public sealed class GetPatientFeedQueryHandler
             }
 
             var since = DateTime.UtcNow.AddDays(-30);
-            var scientificArticles = await _scientificArticleRepo.ListByDiseaseIdsAsync(diseaseIds, since, cancellationToken);
+            var scientificArticles = await _scientificArticleRepo.ListByDiseaseIdsAsync(diseaseIds, request.Language, since, cancellationToken);
 
             var scientificDtos = scientificArticles.Select(a => new ResourceDto(
                 Id: a.Id,

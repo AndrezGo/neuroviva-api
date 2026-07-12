@@ -20,6 +20,7 @@ public sealed class ScientificArticleRecordConfiguration : IEntityTypeConfigurat
         builder.Property(a => a.PublishedAt).HasColumnName("published_at");
         builder.Property(a => a.FetchedAt).HasColumnName("fetched_at");
         builder.Property(a => a.ExternalGuid).HasColumnName("external_guid").IsRequired();
+        builder.Property(a => a.Language).HasColumnName("language").IsRequired().HasMaxLength(2);
         builder.HasIndex(a => new { a.DiseaseId, a.ExternalGuid })
             .IsUnique()
             .HasDatabaseName("ix_scientific_article_record_disease_external_guid");

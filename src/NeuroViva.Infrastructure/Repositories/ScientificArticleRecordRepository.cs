@@ -48,19 +48,20 @@ public sealed class ScientificArticleRecordRepository : IScientificArticleRecord
         }
     }
 
-    public async Task<DateTime?> GetLastFetchedAtAsync(Guid diseaseId, CancellationToken ct = default)
+    public async Task<DateTime?> GetLastFetchedAtAsync(Guid diseaseId, string language, CancellationToken ct = default)
         => await _db.ScientificArticleRecords
             .AsNoTracking()
-            .Where(a => a.DiseaseId == diseaseId)
+            .Where(a => a.DiseaseId == diseaseId && a.Language == language)
             .MaxAsync(a => (DateTime?)a.FetchedAt, ct);
 
     public async Task<IReadOnlyList<ScientificArticleRecord>> ListByDiseaseIdsAsync(
         IReadOnlyCollection<Guid> diseaseIds,
+        string language,
         DateTime sinceDate,
         CancellationToken ct = default)
         => await _db.ScientificArticleRecords
             .AsNoTracking()
-            .Where(a => diseaseIds.Contains(a.DiseaseId) && a.PublishedAt >= sinceDate)
+            .Where(a => diseaseIds.Contains(a.DiseaseId) && a.Language == language && a.PublishedAt >= sinceDate)
             .OrderByDescending(a => a.PublishedAt)
             .ToListAsync(ct);
 }

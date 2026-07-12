@@ -81,11 +81,22 @@ public sealed class PatientController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetResources([FromQuery] string type, CancellationToken ct)
+    public async Task<IActionResult> GetResources(
+        [FromQuery] string type,
+        [FromQuery] string? lang = null,
+        CancellationToken ct = default)
     {
         var mapped = MapResourceType(type);
         if (mapped is null) return BadRequest($"Unknown resource type '{type}'. Allowed: news, scientific_article, video.");
-        var result = await _mediator.Send(new GetPatientFeedQuery(mapped.Value), ct);
+
+        var normalizedLang = string.IsNullOrWhiteSpace(lang)
+            ? "es"
+            : lang.Trim().ToLowerInvariant();
+
+        if (normalizedLang != "es" && normalizedLang != "en")
+            return BadRequest($"Unknown lang '{lang}'. Allowed: es, en.");
+
+        var result = await _mediator.Send(new GetPatientFeedQuery(mapped.Value, normalizedLang), ct);
         if (result.IsFailure)
             return result.Error.Type switch
             {

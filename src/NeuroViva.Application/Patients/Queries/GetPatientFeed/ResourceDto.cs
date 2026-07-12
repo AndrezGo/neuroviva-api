@@ -11,4 +11,5 @@ public sealed record ResourceDto(
     Guid? ChannelId,
     string? ChannelName,
     string? SourceName = null,
-    DateTime? PublishedAt = null);
+    DateTime? PublishedAt = null,
+    string? Authors = null);

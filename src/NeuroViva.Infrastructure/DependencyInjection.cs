@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IResourceRepository, ResourceRepository>();
         services.AddScoped<IChannelRepository, ChannelRepository>();
         services.AddScoped<INewsArticleRepository, NewsArticleRepository>();
+        services.AddScoped<IScientificArticleRecordRepository, ScientificArticleRecordRepository>();
 
         // Community repositories
         services.AddScoped<IGroupRepository, GroupRepository>();
@@ -138,6 +139,13 @@ public static class DependencyInjection
         {
             client.BaseAddress = new Uri("https://news.google.com/");
             client.Timeout = TimeSpan.FromSeconds(10);
+        });
+
+        // Europe PMC typed client (external service, no auth)
+        services.AddHttpClient<IEuropePmcService, EuropePmcService>(client =>
+        {
+            client.BaseAddress = new Uri("https://www.ebi.ac.uk/europepmc/webservices/rest/");
+            client.Timeout = TimeSpan.FromSeconds(15);
         });
 
         return services;

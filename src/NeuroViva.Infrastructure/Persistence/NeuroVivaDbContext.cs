@@ -84,6 +84,7 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<Resource> Resources => Set<Resource>();
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<NewsArticle> NewsArticles => Set<NewsArticle>();
+    public DbSet<ScientificArticleRecord> ScientificArticleRecords => Set<ScientificArticleRecord>();
     public DbSet<ApprovalFlow> ApprovalFlows => Set<ApprovalFlow>();
     public DbSet<ResourcePatient> ResourcePatients => Set<ResourcePatient>();
     public DbSet<CaregiverCourse> CaregiverCourses => Set<CaregiverCourse>();

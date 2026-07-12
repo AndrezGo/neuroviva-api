@@ -21,6 +21,8 @@ public sealed class GetPatientFeedQueryHandler
     private readonly IDiseaseRepository _diseaseRepo;
     private readonly INewsArticleRepository _newsArticleRepo;
     private readonly IGoogleNewsRssService _googleNewsRss;
+    private readonly IScientificArticleRecordRepository _scientificArticleRepo;
+    private readonly IEuropePmcService _europePmc;
 
     public GetPatientFeedQueryHandler(
         ICurrentUserService currentUser,
@@ -30,7 +32,9 @@ public sealed class GetPatientFeedQueryHandler
         IChannelRepository channelRepo,
         IDiseaseRepository diseaseRepo,
         INewsArticleRepository newsArticleRepo,
-        IGoogleNewsRssService googleNewsRss)
+        IGoogleNewsRssService googleNewsRss,
+        IScientificArticleRecordRepository scientificArticleRepo,
+        IEuropePmcService europePmc)
     {
         _currentUser = currentUser;
         _patientRepo = patientRepo;
@@ -40,6 +44,8 @@ public sealed class GetPatientFeedQueryHandler
         _diseaseRepo = diseaseRepo;
         _newsArticleRepo = newsArticleRepo;
         _googleNewsRss = googleNewsRss;
+        _scientificArticleRepo = scientificArticleRepo;
+        _europePmc = europePmc;
     }
 
     public async Task<Result<IReadOnlyList<ResourceDto>>> Handle(
@@ -132,6 +138,63 @@ public sealed class GetPatientFeedQueryHandler
 
             var combined = dtos
                 .Concat(newsDtos)
+                .GroupBy(d => d.Url ?? d.Id.ToString(), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .OrderByDescending(d => d.PublishedAt ?? d.CreatedAt)
+                .ToList();
+
+            return Result<IReadOnlyList<ResourceDto>>.Success(combined);
+        }
+
+        if (request.Type == ResourceType.ScientificArticle && diseaseIds.Count > 0)
+        {
+            foreach (var diseaseId in diseaseIds)
+            {
+                var disease = await _diseaseRepo.GetByIdAsync(diseaseId, cancellationToken);
+                if (disease is null) continue;
+                if (!DiseaseSearchTerms.TryGetSearchTerm(disease.Slug, out var searchTerm)) continue;
+
+                var lastFetched = await _scientificArticleRepo.GetLastFetchedAtAsync(diseaseId, cancellationToken);
+                if (lastFetched is null || lastFetched < DateTime.UtcNow.AddHours(-6))
+                {
+                    var rawItems = await _europePmc.SearchAsync(searchTerm, cancellationToken);
+                    if (rawItems.Count > 0)
+                    {
+                        var toUpsert = rawItems
+                            .Select(x => ScientificArticleRecord.Create(
+                                diseaseId,
+                                x.Title,
+                                x.Link,
+                                x.SourceName,
+                                x.Description,
+                                x.Authors,
+                                x.PublishedAt,
+                                x.ExternalGuid))
+                            .ToList();
+                        await _scientificArticleRepo.UpsertManyAsync(toUpsert, cancellationToken);
+                    }
+                }
+            }
+
+            var since = DateTime.UtcNow.AddDays(-30);
+            var scientificArticles = await _scientificArticleRepo.ListByDiseaseIdsAsync(diseaseIds, since, cancellationToken);
+
+            var scientificDtos = scientificArticles.Select(a => new ResourceDto(
+                Id: a.Id,
+                Title: a.Title,
+                Type: ResourceType.ScientificArticle.ToString(),
+                Url: a.SourceUrl,
+                Description: a.Description,
+                CreatedAt: a.FetchedAt,
+                EmbedUrl: null,
+                ChannelId: null,
+                ChannelName: null,
+                SourceName: a.SourceName,
+                PublishedAt: a.PublishedAt,
+                Authors: a.Authors));
+
+            var combined = dtos
+                .Concat(scientificDtos)
                 .GroupBy(d => d.Url ?? d.Id.ToString(), StringComparer.OrdinalIgnoreCase)
                 .Select(g => g.First())
                 .OrderByDescending(d => d.PublishedAt ?? d.CreatedAt)

@@ -62,7 +62,8 @@ public sealed class GetPatientFeedQueryHandler
         var patientDiseases = await _patientDiseaseRepo.ListByPatientAsync(patient.Id, cancellationToken);
         var diseaseIds = patientDiseases.Select(pd => pd.DiseaseId).ToList();
 
-        var resources = await _resourceRepo.ListApprovedAsync(request.Type, diseaseIds, cancellationToken);
+        var channelFilter = request.Type == ResourceType.Video ? request.ChannelId : null;
+        var resources = await _resourceRepo.ListApprovedAsync(request.Type, diseaseIds, channelFilter, cancellationToken);
 
         var channelIds = resources
             .Where(r => r.ChannelId.HasValue)
@@ -70,10 +71,10 @@ public sealed class GetPatientFeedQueryHandler
             .Distinct()
             .ToList();
 
-        var channelNameById = channelIds.Count == 0
-            ? new Dictionary<Guid, string>()
+        var channelById = channelIds.Count == 0
+            ? new Dictionary<Guid, Channel>()
             : (await _channelRepo.ListByIdsAsync(channelIds, cancellationToken))
-                .ToDictionary(c => c.Id, c => c.Name);
+                .ToDictionary(c => c.Id, c => c);
 
         var dtos = resources.Select(r => new ResourceDto(
             Id: r.Id,
@@ -86,7 +87,8 @@ public sealed class GetPatientFeedQueryHandler
                 ? YouTubeUrlParser.TryGetEmbedUrl(r.Url)
                 : null,
             ChannelId: r.ChannelId,
-            ChannelName: r.ChannelId.HasValue && channelNameById.TryGetValue(r.ChannelId.Value, out var cname) ? cname : null,
+            ChannelName: r.ChannelId.HasValue && channelById.TryGetValue(r.ChannelId.Value, out var ch) ? ch.Name : null,
+            ChannelAvatarUrl: r.ChannelId.HasValue && channelById.TryGetValue(r.ChannelId.Value, out var ch2) ? ch2.AvatarUrl : null,
             SourceName: null,
             PublishedAt: null
         )).ToList();

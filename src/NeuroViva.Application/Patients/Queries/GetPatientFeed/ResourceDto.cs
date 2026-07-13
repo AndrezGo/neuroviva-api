@@ -10,6 +10,7 @@ public sealed record ResourceDto(
     string? EmbedUrl,
     Guid? ChannelId,
     string? ChannelName,
+    string? ChannelAvatarUrl = null,
     string? SourceName = null,
     DateTime? PublishedAt = null,
     string? Authors = null);

@@ -18,12 +18,14 @@ public sealed class ResourceRepository : IResourceRepository
     public async Task<IReadOnlyList<Resource>> ListApprovedAsync(
         ResourceType type,
         IReadOnlyCollection<Guid> diseaseIds,
+        Guid? channelId = null,
         CancellationToken ct = default)
         => await _db.Resources
             .AsNoTracking()
             .Where(r => r.Type == type
                 && r.ApprovalStatus == "aprobado"
-                && (r.DiseaseId == null || diseaseIds.Contains(r.DiseaseId.Value)))
+                && (r.DiseaseId == null || diseaseIds.Contains(r.DiseaseId.Value))
+                && (channelId == null || r.ChannelId == channelId.Value))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Resource>> ListPendingAsync(CancellationToken ct = default)

@@ -84,6 +84,7 @@ public sealed class PatientController : ControllerBase
     public async Task<IActionResult> GetResources(
         [FromQuery] string type,
         [FromQuery] string? lang = null,
+        [FromQuery] string? channelId = null,
         CancellationToken ct = default)
     {
         var mapped = MapResourceType(type);
@@ -96,7 +97,11 @@ public sealed class PatientController : ControllerBase
         if (normalizedLang != "es" && normalizedLang != "en")
             return BadRequest($"Unknown lang '{lang}'. Allowed: es, en.");
 
-        var result = await _mediator.Send(new GetPatientFeedQuery(mapped.Value, normalizedLang), ct);
+        Guid? parsedChannelId = null;
+        if (!string.IsNullOrWhiteSpace(channelId) && Guid.TryParse(channelId, out var parsed))
+            parsedChannelId = parsed;
+
+        var result = await _mediator.Send(new GetPatientFeedQuery(mapped.Value, normalizedLang, parsedChannelId), ct);
         if (result.IsFailure)
             return result.Error.Type switch
             {

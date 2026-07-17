@@ -62,6 +62,7 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<PatientDoctor> PatientDoctors => Set<PatientDoctor>();
     public DbSet<PatientCaregiver> PatientCaregivers => Set<PatientCaregiver>();
     public DbSet<ClinicalRecord> ClinicalRecords => Set<ClinicalRecord>();
+    public DbSet<ClinicalRecordAttachment> ClinicalRecordAttachments => Set<ClinicalRecordAttachment>();
     public DbSet<PatientDisease> PatientDiseases => Set<PatientDisease>();
 
     // Medications

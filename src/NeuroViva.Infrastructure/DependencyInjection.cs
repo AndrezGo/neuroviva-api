@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Common.Options;
+using NeuroViva.Application.Common.Services;
 using NeuroViva.Application.Doctors;
+using NeuroViva.Application.MedicalRecords;
 using NeuroViva.Application.Features.Users.Queries;
 using NeuroViva.Domain.Abstractions;
 using NeuroViva.Domain.Ai.Repositories;
@@ -70,6 +72,10 @@ public static class DependencyInjection
         // Read repositories
         services.AddScoped<IUserReadRepository, UserReadRepository>();
         services.AddScoped<ICaregiverReadRepository, CaregiverReadRepository>();
+        services.AddScoped<IMedicalRecordReadRepository, MedicalRecordReadRepository>();
+
+        // Application services
+        services.AddScoped<IPatientAccessGuard, PatientAccessGuard>();
 
         // Caregiver write repositories
         services.AddScoped<ICaregiverRepository, CaregiverRepository>();

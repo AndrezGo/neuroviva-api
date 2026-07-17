@@ -3,7 +3,6 @@ using Asp.Versioning;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NeuroViva.Application.Caregivers.Commands.AddClinicalNote;
 using NeuroViva.Application.Caregivers.Commands.CancelAppointment;
 using NeuroViva.Application.Caregivers.Commands.SubmitAppointmentOutcome;
 using NeuroViva.Application.Caregivers.Commands.CreateAppointment;
@@ -19,7 +18,6 @@ using NeuroViva.Application.Caregivers.Commands.DeleteSymptom;
 using NeuroViva.Application.Caregivers.Commands.SaveOnboarding;
 using NeuroViva.Application.Caregivers.Queries.GetAppointments;
 using NeuroViva.Application.Caregivers.Queries.GetPatientDoctor;
-using NeuroViva.Application.Caregivers.Queries.GetClinicalHistory;
 using NeuroViva.Application.Caregivers.Queries.GetMedicationLogs;
 using NeuroViva.Application.Caregivers.Queries.GetMedications;
 using NeuroViva.Application.Caregivers.Queries.GetNotifications;
@@ -562,77 +560,6 @@ public sealed class CaregiverController : ControllerBase
     }
 
     /// <summary>
-    /// Returns the unified clinical history timeline for the caregiver's linked patient.
-    /// Combines symptoms, appointments, medication logs and manual clinical records.
-    /// Returns an empty array when no patient is linked.
-    /// </summary>
-    [HttpGet("history")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetHistory(CancellationToken ct)
-    {
-        var result = await _mediator.Send(new GetClinicalHistoryQuery(), ct);
-
-        if (result.IsFailure)
-            return result.Error.Type switch
-            {
-                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
-                _ => BadRequest(result.Error.Message)
-            };
-
-        return Ok(result.Value);
-    }
-
-    /// <summary>
-    /// Adds a manual clinical note (consultation, exam, note or other) to the patient's history.
-    /// Optionally attach a scanned document or image (max 10 MB; accepted types: image/jpeg, image/png, image/webp, application/pdf).
-    /// </summary>
-    [HttpPost("history")]
-    [Consumes("multipart/form-data")]
-    [RequestSizeLimit(11 * 1024 * 1024)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> AddClinicalNote(
-        [FromForm] AddClinicalNoteRequest request,
-        CancellationToken ct)
-    {
-        byte[]? attachmentBytes = null;
-        string? attachmentFileName = null;
-        string? attachmentContentType = null;
-
-        if (request.Attachment is not null)
-        {
-            using var ms = new MemoryStream();
-            await request.Attachment.CopyToAsync(ms, ct);
-            attachmentBytes = ms.ToArray();
-            attachmentFileName = request.Attachment.FileName;
-            attachmentContentType = request.Attachment.ContentType;
-        }
-
-        var command = new AddClinicalNoteCommand(
-            EventType: request.EventType,
-            Description: request.Description,
-            EventDate: request.EventDate,
-            AttachmentBytes: attachmentBytes,
-            AttachmentFileName: attachmentFileName,
-            AttachmentContentType: attachmentContentType);
-
-        var result = await _mediator.Send(command, ct);
-
-        if (result.IsFailure)
-            return result.Error.Type switch
-            {
-                ErrorType.NotFound => NotFound(result.Error.Message),
-                ErrorType.Unauthorized => Unauthorized(result.Error.Message),
-                _ => BadRequest(result.Error.Message)
-            };
-
-        return Ok(new { recordId = result.Value.RecordId });
-    }
-
-    /// <summary>
     /// Returns the most recent 30 InApp notifications for the authenticated caregiver.
     /// </summary>
     [HttpGet("notifications")]
@@ -760,14 +687,6 @@ public sealed record RegisterSymptomRequest(
     DateTime? LoggedAt);
 
 public sealed record UpdateSymptomRequest(string Type, int Intensity, string? Description);
-
-public sealed class AddClinicalNoteRequest
-{
-    public string EventType { get; set; } = default!;
-    public string Description { get; set; } = default!;
-    public DateTime? EventDate { get; set; }
-    public IFormFile? Attachment { get; set; }
-}
 
 public sealed record AssignDoctorToPatientRequest(Guid DoctorId);
 

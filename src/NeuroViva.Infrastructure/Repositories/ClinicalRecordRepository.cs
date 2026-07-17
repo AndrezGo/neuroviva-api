@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using NeuroViva.Domain.Patients;
 using NeuroViva.Domain.Patients.Repositories;
 using NeuroViva.Infrastructure.Persistence;
@@ -12,4 +13,9 @@ public sealed class ClinicalRecordRepository : IClinicalRecordRepository
 
     public async Task AddAsync(ClinicalRecord record, CancellationToken ct = default)
         => await _db.ClinicalRecords.AddAsync(record, ct);
+
+    public Task<ClinicalRecord?> GetByIdAsync(Guid id, CancellationToken ct = default)
+        => _db.ClinicalRecords
+            .Include(r => r.Attachments)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
 }

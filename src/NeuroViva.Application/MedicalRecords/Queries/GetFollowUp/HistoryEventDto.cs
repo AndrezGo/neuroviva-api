@@ -1,4 +1,4 @@
-namespace NeuroViva.Application.Caregivers.Queries.GetClinicalHistory;
+namespace NeuroViva.Application.MedicalRecords.Queries.GetFollowUp;
 
 public sealed record HistoryEventDto(
     Guid Id,

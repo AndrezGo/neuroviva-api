@@ -80,6 +80,8 @@ public sealed class NeuroVivaDbContext : DbContext, IUnitOfWork
     public DbSet<AiAnalysis> AiAnalyses => Set<AiAnalysis>();
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AiChatConversation> AiChatConversations => Set<AiChatConversation>();
+    public DbSet<AiChatMessage> AiChatMessages => Set<AiChatMessage>();
 
     // Content
     public DbSet<Resource> Resources => Set<Resource>();

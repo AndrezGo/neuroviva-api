@@ -217,4 +217,145 @@ public sealed class MedicalRecordReadRepository : IMedicalRecordReadRepository
             .Select(x => x.Dto)
             .ToList();
     }
+
+    // -------------------------------------------------------------------------
+    // Plain-text variants for AI context building (no signed URLs, no attachments)
+    // -------------------------------------------------------------------------
+
+    public async Task<IReadOnlyList<ClinicalRecordTextDto>> ListExamsTextAsync(
+        Guid patientId,
+        int limit,
+        CancellationToken ct = default)
+    {
+        return await _db.ClinicalRecords
+            .AsNoTracking()
+            .Where(c => c.PatientId == patientId && c.EventType == ClinicalEventType.Exam)
+            .OrderByDescending(c => c.EventDate)
+            .Take(limit)
+            .Select(c => new ClinicalRecordTextDto(
+                c.Id,
+                "exam",
+                c.Description,
+                c.EventDate))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ClinicalRecordTextDto>> ListClinicalNotesTextAsync(
+        Guid patientId,
+        int limit,
+        CancellationToken ct = default)
+    {
+        var records = await _db.ClinicalRecords
+            .AsNoTracking()
+            .Where(c => c.PatientId == patientId &&
+                        (c.EventType == ClinicalEventType.Consultation ||
+                         c.EventType == ClinicalEventType.Note ||
+                         c.EventType == ClinicalEventType.Other))
+            .OrderByDescending(c => c.EventDate)
+            .Take(limit)
+            .Select(c => new { c.Id, c.EventType, c.Description, c.EventDate })
+            .ToListAsync(ct);
+
+        return records.Select(c => new ClinicalRecordTextDto(
+            Id: c.Id,
+            EventType: c.EventType switch
+            {
+                ClinicalEventType.Consultation => "consultation",
+                ClinicalEventType.Note => "note",
+                _ => "other"
+            },
+            Description: c.Description,
+            EventDate: c.EventDate)).ToList();
+    }
+
+    public async Task<IReadOnlyList<HistoryEventTextDto>> ListFollowUpTextAsync(
+        Guid patientId,
+        int limit,
+        CancellationToken ct = default)
+    {
+        var rawEvents = new List<(DateTime When, HistoryEventTextDto Dto)>();
+
+        // Symptoms
+        var symptomRows = await _db.Symptoms
+            .AsNoTracking()
+            .Where(s => s.PatientId == patientId && !s.IsDeleted)
+            .OrderByDescending(s => s.LoggedAt)
+            .Take(limit)
+            .Select(s => new { s.Id, s.Type, s.Description, s.LoggedAt })
+            .ToListAsync(ct);
+
+        foreach (var s in symptomRows)
+        {
+            rawEvents.Add((s.LoggedAt, new HistoryEventTextDto(
+                Id: s.Id,
+                Type: "symptom",
+                Title: !string.IsNullOrWhiteSpace(s.Type) ? s.Type : "Síntoma",
+                Description: s.Description,
+                EventDate: s.LoggedAt,
+                Status: null)));
+        }
+
+        // Appointments
+        var appointmentRows = await _db.Appointments
+            .AsNoTracking()
+            .Where(a => a.PatientId == patientId)
+            .OrderByDescending(a => a.ScheduledAt)
+            .Take(limit)
+            .Select(a => new { a.Id, a.Type, a.Notes, a.ScheduledAt, a.Status })
+            .ToListAsync(ct);
+
+        foreach (var a in appointmentRows)
+        {
+            var typeStr = a.Type.ToString();
+            var title = !string.IsNullOrWhiteSpace(a.Notes)
+                ? a.Notes.Split('\n')[0].Trim()
+                : char.ToUpperInvariant(typeStr[0]) + typeStr[1..].ToLowerInvariant();
+
+            string? description = null;
+            if (!string.IsNullOrWhiteSpace(a.Notes))
+            {
+                var parts = a.Notes.Split('\n', 2);
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                    description = parts[1].Trim();
+            }
+
+            rawEvents.Add((a.ScheduledAt, new HistoryEventTextDto(
+                Id: a.Id,
+                Type: typeStr.ToLowerInvariant(),
+                Title: title,
+                Description: description,
+                EventDate: a.ScheduledAt,
+                Status: a.Status.ToString().ToLowerInvariant())));
+        }
+
+        // Medication logs — "taken" entries only
+        var medLogRows = await _db.MedicationLogs
+            .AsNoTracking()
+            .Where(l => l.Taken)
+            .Join(
+                _db.Medications.Where(m => m.PatientId == patientId),
+                l => l.MedicationId,
+                m => m.Id,
+                (l, m) => new { l.Id, MedicationName = m.Name, l.Notes, l.LoggedAt })
+            .OrderByDescending(x => x.LoggedAt)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        foreach (var l in medLogRows)
+        {
+            rawEvents.Add((l.LoggedAt, new HistoryEventTextDto(
+                Id: l.Id,
+                Type: "medication",
+                Title: l.MedicationName,
+                Description: l.Notes,
+                EventDate: l.LoggedAt,
+                Status: null)));
+        }
+
+        return rawEvents
+            .OrderByDescending(x => x.When)
+            .Take(limit)
+            .Select(x => x.Dto)
+            .ToList();
+    }
 }

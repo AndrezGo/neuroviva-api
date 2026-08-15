@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using NeuroViva.Application.Ai;
+using NeuroViva.Application.Ai.Services;
 using NeuroViva.Application.Caregivers;
 using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Common.Options;
@@ -153,6 +156,24 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://www.ebi.ac.uk/europepmc/webservices/rest/");
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+
+        // Groq AI Chat typed client
+        services.Configure<GroqOptions>(configuration.GetSection(GroqOptions.SectionName));
+
+        services.AddHttpClient<IGroqChatService, GroqChatService>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<IOptions<GroqOptions>>().Value;
+            client.BaseAddress = new Uri(opts.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(opts.TimeoutSeconds);
+        });
+
+        // AI chat repositories
+        services.AddScoped<IAiChatConversationRepository, AiChatConversationRepository>();
+        services.AddScoped<IAiChatMessageRepository, AiChatMessageRepository>();
+
+        // Patient context services
+        services.AddScoped<IPatientContextReadRepository, PatientContextReadRepository>();
+        services.AddScoped<IPatientContextBuilder, PatientContextBuilder>();
 
         return services;
     }

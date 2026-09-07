@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.Extensions.Logging;
 using NeuroViva.Application.Common.Abstractions;
 using NeuroViva.Application.Common.Models;
 using NeuroViva.Application.Common.Options;
@@ -19,6 +20,8 @@ public sealed class UploadClinicalNoteCommandHandler
     private readonly IStorageService _storageService;
     private readonly StorageOptions _storageOptions;
     private readonly ICurrentUserService _currentUser;
+    private readonly IPdfTextExtractor _pdfExtractor;
+    private readonly ILogger<UploadClinicalNoteCommandHandler> _logger;
 
     public UploadClinicalNoteCommandHandler(
         IPatientAccessGuard guard,
@@ -26,7 +29,9 @@ public sealed class UploadClinicalNoteCommandHandler
         IUnitOfWork uow,
         IStorageService storageService,
         StorageOptions storageOptions,
-        ICurrentUserService currentUser)
+        ICurrentUserService currentUser,
+        IPdfTextExtractor pdfExtractor,
+        ILogger<UploadClinicalNoteCommandHandler> logger)
     {
         _guard = guard;
         _clinicalRecordRepo = clinicalRecordRepo;
@@ -34,6 +39,8 @@ public sealed class UploadClinicalNoteCommandHandler
         _storageService = storageService;
         _storageOptions = storageOptions;
         _currentUser = currentUser;
+        _pdfExtractor = pdfExtractor;
+        _logger = logger;
     }
 
     public async Task<Result<UploadClinicalNoteResult>> Handle(
@@ -90,12 +97,30 @@ public sealed class UploadClinicalNoteCommandHandler
                 attachment.ContentType,
                 cancellationToken);
 
+            // Extract text after upload, before persisting. Never lets extraction failures
+            // abort the upload — defence in depth on top of TryExtractText's own catch.
+            string? extractedText = null;
+            if (attachment.ContentType == "application/pdf")
+            {
+                try
+                {
+                    extractedText = _pdfExtractor.TryExtractText(attachment.Bytes);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Unexpected exception from IPdfTextExtractor for file '{FileName}'. ExtractedText will be null.",
+                        sanitizedFileName);
+                }
+            }
+
             record.AddAttachment(
                 storagePath: storagePath,
                 fileName: sanitizedFileName,
                 contentType: attachment.ContentType,
                 fileSizeBytes: attachment.Bytes.Length,
-                uploadedBy: _currentUser.UserId!.Value);
+                uploadedBy: _currentUser.UserId!.Value,
+                extractedText: extractedText);
         }
 
         await _clinicalRecordRepo.AddAsync(record, cancellationToken);

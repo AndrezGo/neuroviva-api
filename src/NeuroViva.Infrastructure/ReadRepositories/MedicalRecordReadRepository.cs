@@ -227,17 +227,22 @@ public sealed class MedicalRecordReadRepository : IMedicalRecordReadRepository
         int limit,
         CancellationToken ct = default)
     {
-        return await _db.ClinicalRecords
+        var records = await _db.ClinicalRecords
             .AsNoTracking()
+            .Include(c => c.Attachments)
             .Where(c => c.PatientId == patientId && c.EventType == ClinicalEventType.Exam)
             .OrderByDescending(c => c.EventDate)
             .Take(limit)
-            .Select(c => new ClinicalRecordTextDto(
-                c.Id,
-                "exam",
-                c.Description,
-                c.EventDate))
             .ToListAsync(ct);
+
+        return records.Select(c => new ClinicalRecordTextDto(
+            Id: c.Id,
+            EventType: "exam",
+            Description: c.Description,
+            EventDate: c.EventDate,
+            Attachments: c.Attachments
+                .Select(a => new ClinicalRecordAttachmentTextDto(a.FileName, a.ContentType, a.ExtractedText))
+                .ToList())).ToList();
     }
 
     public async Task<IReadOnlyList<ClinicalRecordTextDto>> ListClinicalNotesTextAsync(
@@ -247,13 +252,13 @@ public sealed class MedicalRecordReadRepository : IMedicalRecordReadRepository
     {
         var records = await _db.ClinicalRecords
             .AsNoTracking()
+            .Include(c => c.Attachments)
             .Where(c => c.PatientId == patientId &&
                         (c.EventType == ClinicalEventType.Consultation ||
                          c.EventType == ClinicalEventType.Note ||
                          c.EventType == ClinicalEventType.Other))
             .OrderByDescending(c => c.EventDate)
             .Take(limit)
-            .Select(c => new { c.Id, c.EventType, c.Description, c.EventDate })
             .ToListAsync(ct);
 
         return records.Select(c => new ClinicalRecordTextDto(
@@ -265,7 +270,10 @@ public sealed class MedicalRecordReadRepository : IMedicalRecordReadRepository
                 _ => "other"
             },
             Description: c.Description,
-            EventDate: c.EventDate)).ToList();
+            EventDate: c.EventDate,
+            Attachments: c.Attachments
+                .Select(a => new ClinicalRecordAttachmentTextDto(a.FileName, a.ContentType, a.ExtractedText))
+                .ToList())).ToList();
     }
 
     public async Task<IReadOnlyList<HistoryEventTextDto>> ListFollowUpTextAsync(

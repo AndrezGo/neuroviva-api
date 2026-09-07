@@ -12,6 +12,15 @@ public sealed class ClinicalRecordAttachment : Entity<Guid>
     public Guid UploadedBy { get; private set; }
     public DateTime UploadedAt { get; private set; }
 
+    /// <summary>
+    /// Plain text extracted from the file at upload time (PDF only).
+    /// Null when extraction is not applicable (image), was not possible (encrypted/scanned PDF),
+    /// or when the record predates extraction support (backfill pending).
+    /// Persisted up to 6000 characters — sufficient to cover typical lab reports (2-5 pages,
+    /// ~3-5k chars) without inflating storage for pathological cases.
+    /// </summary>
+    public string? ExtractedText { get; private set; }
+
     private ClinicalRecordAttachment() { }
 
     public static ClinicalRecordAttachment Create(
@@ -21,6 +30,7 @@ public sealed class ClinicalRecordAttachment : Entity<Guid>
         string contentType,
         long? fileSizeBytes,
         Guid uploadedBy,
+        string? extractedText = null,
         Guid? id = null)
     {
         if (string.IsNullOrWhiteSpace(storagePath))
@@ -39,7 +49,14 @@ public sealed class ClinicalRecordAttachment : Entity<Guid>
             ContentType = contentType,
             FileSizeBytes = fileSizeBytes,
             UploadedBy = uploadedBy,
-            UploadedAt = DateTime.UtcNow
+            UploadedAt = DateTime.UtcNow,
+            ExtractedText = extractedText
         };
     }
+
+    /// <summary>
+    /// Updates the extracted text after upload (used by the admin backfill endpoint).
+    /// Replaces any existing value; pass null to clear.
+    /// </summary>
+    public void SetExtractedText(string? text) => ExtractedText = text;
 }

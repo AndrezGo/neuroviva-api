@@ -43,7 +43,8 @@ public sealed class ClinicalRecord : Entity<Guid>
         string fileName,
         string contentType,
         long? fileSizeBytes,
-        Guid uploadedBy)
+        Guid uploadedBy,
+        string? extractedText = null)
     {
         var attachment = ClinicalRecordAttachment.Create(
             clinicalRecordId: this.Id,
@@ -51,7 +52,8 @@ public sealed class ClinicalRecord : Entity<Guid>
             fileName: fileName,
             contentType: contentType,
             fileSizeBytes: fileSizeBytes,
-            uploadedBy: uploadedBy);
+            uploadedBy: uploadedBy,
+            extractedText: extractedText);
 
         _attachments.Add(attachment);
     }

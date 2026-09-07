@@ -18,6 +18,10 @@ public sealed class ClinicalRecordAttachmentConfiguration : IEntityTypeConfigura
         builder.Property(a => a.FileSizeBytes).HasColumnName("file_size_bytes").IsRequired(false);
         builder.Property(a => a.UploadedBy).HasColumnName("uploaded_by");
         builder.Property(a => a.UploadedAt).HasColumnName("uploaded_at");
+        builder.Property(a => a.ExtractedText)
+            .HasColumnName("extracted_text")
+            .HasColumnType("text")
+            .IsRequired(false);
 
         builder.HasIndex(a => a.ClinicalRecordId);
     }

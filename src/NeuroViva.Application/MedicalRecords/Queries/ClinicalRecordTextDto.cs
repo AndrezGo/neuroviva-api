@@ -4,4 +4,5 @@ public sealed record ClinicalRecordTextDto(
     Guid Id,
     string EventType,
     string Description,
-    DateTime EventDate);
+    DateTime EventDate,
+    IReadOnlyList<ClinicalRecordAttachmentTextDto> Attachments);

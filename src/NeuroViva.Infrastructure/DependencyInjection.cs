@@ -27,6 +27,7 @@ using NeuroViva.Infrastructure.DomainEvents;
 using NeuroViva.Infrastructure.ExternalServices;
 using NeuroViva.Infrastructure.ExternalServices.Clock;
 using NeuroViva.Infrastructure.Identity;
+using NeuroViva.Infrastructure.Pdf;
 using NeuroViva.Infrastructure.Persistence;
 using NeuroViva.Infrastructure.ReadRepositories;
 using NeuroViva.Infrastructure.Repositories;
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<IPdfTextExtractor, PdfPigTextExtractor>();
         services.AddScoped<IDomainEventDispatcher, MediatorDomainEventDispatcher>();
 
         var connectionString = configuration["Database:ConnectionString"]

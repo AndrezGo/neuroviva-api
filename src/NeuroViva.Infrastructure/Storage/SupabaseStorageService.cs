@@ -81,6 +81,24 @@ public sealed class SupabaseStorageService : IStorageService
     }
 
     /// <inheritdoc />
+    public async Task<byte[]> DownloadAsync(
+        string bucket,
+        string path,
+        CancellationToken ct = default)
+    {
+        var encodedPath = EncodePath(path);
+        var url = $"{_options.Url.TrimEnd('/')}/storage/v1/object/{bucket}/{encodedPath}";
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
+        AddAuthHeaders(requestMessage);
+
+        var response = await _http.SendAsync(requestMessage, ct);
+        await EnsureSuccessAsync(response, ct);
+
+        return await response.Content.ReadAsByteArrayAsync(ct);
+    }
+
+    /// <inheritdoc />
     public async Task DeleteAsync(
         string bucket,
         string path,

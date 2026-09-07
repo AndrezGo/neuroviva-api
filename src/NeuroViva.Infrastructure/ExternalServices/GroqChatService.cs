@@ -43,7 +43,8 @@ public sealed class GroqChatService : IGroqChatService
         var requestBody = new GroqRequestBody(
             Model: opts.Model,
             Messages: messages.Select(m => new GroqMessageDto(m.Role, m.Content)).ToArray(),
-            MaxTokens: opts.MaxTokens);
+            MaxTokens: opts.MaxTokens,
+            ReasoningEffort: opts.ReasoningEffort);
 
         var json = JsonSerializer.Serialize(requestBody, JsonOptions);
 
@@ -73,6 +74,27 @@ public sealed class GroqChatService : IGroqChatService
                 catch
                 {
                     bodyPreview = "could not read body preview";
+                }
+
+                if (statusCode == 404)
+                {
+                    try
+                    {
+                        using var errorDoc = JsonDocument.Parse(bodyPreview);
+                        if (errorDoc.RootElement.TryGetProperty("error", out var errorProp)
+                            && errorProp.TryGetProperty("code", out var codeProp)
+                            && codeProp.GetString() == "model_not_found")
+                        {
+                            _logger.LogError(
+                                "[GROQ_MODEL_MISSING] El modelo configurado '{Model}' ya no existe o no esta disponible para esta cuenta. " +
+                                "Verificar catalogo actual en https://api.groq.com/openai/v1/models",
+                                opts.Model);
+                        }
+                    }
+                    catch
+                    {
+                        // Body malformado — ignorar silenciosamente y continuar con el flujo estandar.
+                    }
                 }
 
                 _logger.LogWarning(
@@ -150,6 +172,6 @@ public sealed class GroqChatService : IGroqChatService
     }
 
     // Private DTOs for Groq/OpenAI request format (snake_case via JsonOptions)
-    private sealed record GroqRequestBody(string Model, GroqMessageDto[] Messages, int MaxTokens);
+    private sealed record GroqRequestBody(string Model, GroqMessageDto[] Messages, int MaxTokens, string? ReasoningEffort);
     private sealed record GroqMessageDto(string Role, string Content);
 }
